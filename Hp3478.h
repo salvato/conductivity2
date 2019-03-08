@@ -34,6 +34,7 @@ public:
     virtual ~Hp3478();
 
 signals:
+    void     readyForTrigger();
     void     newReading(QDateTime currentTime, QString sReading);
 
 public slots:

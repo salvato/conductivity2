@@ -105,6 +105,8 @@ private slots:
     void onKeithleyReadyForTrigger();
     void onNewRvsTKeithleyReading(QDateTime dataTime, QString sDataRead);
     void onNewRvsTimeKeithleyReading(QDateTime dataTime, QString sDataRead);
+    void onNewRvsTimeHp3478Reading(QDateTime, QString);
+    void onHp3478ReadyForTrigger();
     void onNewLambdaScanKeithleyReading(QDateTime dataTime, QString sDataRead);
     bool onKeithleyReadyForSweepTrigger();
     void onKeithleySweepDone(QDateTime dataTime, QString sData);

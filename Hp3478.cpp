@@ -117,7 +117,7 @@ Hp3478::endRvsTime() {
     gpibWrite(gpibId, "N5");// 5 Digits
     gpibWrite(gpibId, "Z1");// Auto zero ON
     gpibWrite(gpibId, "D1");// Normal Display
-    gpibWrite(gpibId, "T1");// Internal Trigger
+    gpibWrite(gpibId, "T1\r\n");// Internal Trigger
     return NO_ERROR;
 }
 
@@ -131,7 +131,7 @@ Hp3478::initRvsTime() {
     iErr |= gpibWrite(gpibId, "N5"); // 5 Digits
     iErr |= gpibWrite(gpibId, "Z1"); // Auto zero ON
     iErr |= gpibWrite(gpibId, "D1"); // Normal Display
-    iErr |= gpibWrite(gpibId, "T3"); // Single Trigger
+    iErr |= gpibWrite(gpibId, "T3\r\n"); // Single Trigger
     if(iErr & ERR) {
         QString sError;
         sError = QString(Q_FUNC_INFO) + QString("GPIB Error in gpibWrite(): - Status= %1")
@@ -140,7 +140,7 @@ Hp3478::initRvsTime() {
         emit sendMessage(sError);
         return -1;
     }
-    iErr = gpibWrite(gpibId, "M75");// Enable SRQ
+    iErr = gpibWrite(gpibId, "M75\r\n");// Enable SRQ
     if(iErr & ERR) {
         QString sError;
         sError = QString(Q_FUNC_INFO) + QString("GPIB Error in gpibWrite(): - Status= %1")

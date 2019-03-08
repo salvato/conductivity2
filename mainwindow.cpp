@@ -812,15 +812,17 @@ MainWindow::on_startRvsTimeButton_clicked() {
         connect(pHp3478, SIGNAL(newReading(QDateTime, QString)),
                 this, SLOT(onNewRvsTimeHp3478Reading(QDateTime, QString)));
     }
-
-    // Initializing LakeShore 330
-    ui->statusBar->showMessage("Initializing LakeShore 330...");
-    if(pLakeShore330->init()) {
-        ui->statusBar->showMessage("Unable to Initialize LakeShore 330...");
-        pKeithley236->disconnect();
-        QApplication::restoreOverrideCursor();
-        return;
+    if(pLakeShore330) {
+        // Initializing LakeShore 330
+        ui->statusBar->showMessage("Initializing LakeShore 330...");
+        if(pLakeShore330->init()) {
+            ui->statusBar->showMessage("Unable to Initialize LakeShore 330...");
+            pKeithley236->disconnect();
+            QApplication::restoreOverrideCursor();
+            return;
+        }
     }
+
     // Open the Output file
     ui->statusBar->showMessage("Opening Output file...");
     if(!prepareOutputFile(pConfigureDialog->pTabFile->sBaseDir,
@@ -831,36 +833,49 @@ MainWindow::on_startRvsTimeButton_clicked() {
         QApplication::restoreOverrideCursor();
         return;
     }
-    writeRvsTimeHeader();
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>writeRvsTimeHeader();
     // Init the Plots
     initRvsTimePlots();
-    // Configure Source-Measure Unit
-    double dCompliance = pConfigureDialog->pTabK236->dCompliance;
-    if(pConfigureDialog->pTabK236->bSourceI) {
-        presentMeasure = RvsTimeSourceI;
-        double dAppliedCurrent = pConfigureDialog->pTabK236->dStart;
-        pKeithley236->initVvsTSourceI(dAppliedCurrent, dCompliance);
-    }
-    else {
-        presentMeasure = RvsTimeSourceV;
-        double dAppliedVoltage = pConfigureDialog->pTabK236->dStart;
-        pKeithley236->initVvsTSourceV(dAppliedVoltage, dCompliance);
-    }
-    // Configure the needed timers
-    connect(&readingTTimer, SIGNAL(timeout()),
-            this, SLOT(onTimeToReadT()));
-    // Read and plot initial value of Temperature
-    startReadingTTime = QDateTime::currentDateTime();
-    onTimeToReadT();
-    readingTTimer.start(30000);
-    if(pConfigureDialog->pTabLS330->bUseThermostat) {
-        pLakeShore330->setTemperature(pConfigureDialog->pTabLS330->dTStart);
-        pLakeShore330->switchPowerOn(3);
-        if(!pLakeShore330->startRamp(pConfigureDialog->pTabLS330->dTStop, pConfigureDialog->pTabLS330->dTRate)) {
-            ui->statusBar->showMessage(QString("Error Starting the Measure"));
-            return;
+
+    if(pKeithley236) {
+        // Configure Source-Measure Unit
+        double dCompliance = pConfigureDialog->pTabK236->dCompliance;
+        if(pConfigureDialog->pTabK236->bSourceI) {
+            presentMeasure = RvsTimeSourceI;
+            double dAppliedCurrent = pConfigureDialog->pTabK236->dStart;
+            pKeithley236->initVvsTSourceI(dAppliedCurrent, dCompliance);
+        }
+        else {
+            presentMeasure = RvsTimeSourceV;
+            double dAppliedVoltage = pConfigureDialog->pTabK236->dStart;
+            pKeithley236->initVvsTSourceV(dAppliedVoltage, dCompliance);
         }
     }
+
+    if(pHp3478) {
+        // Configure Multimeter
+        presentMeasure = RvsTimeSourceI;
+        pHp3478->initRvsTime();
+    }
+
+    // Configure the needed timers
+    if(pLakeShore330) {
+        connect(&readingTTimer, SIGNAL(timeout()),
+                this, SLOT(onTimeToReadT()));
+        // Read and plot initial value of Temperature
+        startReadingTTime = QDateTime::currentDateTime();
+        onTimeToReadT();
+        readingTTimer.start(30000);
+        if(pConfigureDialog->pTabLS330->bUseThermostat) {
+            pLakeShore330->setTemperature(pConfigureDialog->pTabLS330->dTStart);
+            pLakeShore330->switchPowerOn(3);
+            if(!pLakeShore330->startRamp(pConfigureDialog->pTabLS330->dTStop, pConfigureDialog->pTabLS330->dTRate)) {
+                ui->statusBar->showMessage(QString("Error Starting the Measure"));
+                return;
+            }
+        }
+    }
+/*
     ui->startRvsTButton->setDisabled(true);
     ui->startIvsVButton->setDisabled(true);
     ui->startRvsTimeButton->setText("Stop R vs Time");
@@ -871,9 +886,16 @@ MainWindow::on_startRvsTimeButton_clicked() {
     connect(&measuringTimer, SIGNAL(timeout()),
             this, SLOT(onTimeToGetNewMeasure()));
     measuringTimer.start(int(timeBetweenMeasurements));
+*/
     dateStart = QDateTime::currentDateTime();
     ui->statusBar->showMessage(QString("%1 Measure started")
                                .arg(dateStart.toString()));
+}
+
+
+void
+MainWindow::onHp3478ReadyForTrigger() {
+
 }
 
 
@@ -882,8 +904,8 @@ MainWindow::writeRvsTimeHeader() {
     // Write the header
     // To cope with the GnuPlot way to handle the comment lines
     // we need a # as a first chraracter in each row.
-    pOutputFile->write(QString("#%1 %2 %3 %4\n")
-                       .arg("Time[s]", 12)
+    pOutputFile->write(QString("%1 %2 %3 %4\n")
+                       .arg("#Time[s]", 12)
                        .arg("V[V]", 12)
                        .arg("I[A]", 12)
                        .arg("T[K]", 12)
@@ -1403,6 +1425,7 @@ MainWindow::initRvsTimePlots() {
     pPlotMeasurements = Q_NULLPTR;
     if(pPlotTemperature) delete pPlotTemperature;
     pPlotTemperature = Q_NULLPTR;
+
     // Plot of Resistance vs Time
     sMeasurementPlotLabel = QString("R [Ohm] -vs- Time [s]");
     pPlotMeasurements = new Plot2D(this, sMeasurementPlotLabel);
@@ -1421,7 +1444,9 @@ MainWindow::initRvsTimePlots() {
     pPlotMeasurements->UpdatePlot();
     pPlotMeasurements->show();
 
-    initTemperaturePlot();
+    if(bUseLakeShore330) {
+        initTemperaturePlot();
+    }
 }
 
 
@@ -1734,6 +1759,15 @@ MainWindow::onNewRvsTKeithleyReading(QDateTime dataTime, QString sDataRead) {
         pOutputFile->flush();
         switchLampOff();
     }
+}
+
+void
+MainWindow::onNewRvsTimeHp3478Reading(QDateTime dateTime, QString sDataRead) {
+    double resistance, elapsedTime;
+    resistance = sDataRead.toDouble();
+    elapsedTime = double(dateStart.secsTo(dateTime));
+    pPlotMeasurements->NewPoint(iPlotDark, elapsedTime, resistance);
+    pPlotMeasurements->UpdatePlot();
 }
 
 
