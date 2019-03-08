@@ -112,13 +112,34 @@ Hp3478::endRvsTime() {
 #else
     ibnotify(gpibId, 0, NULL, NULL);// disable notification
 #endif
-    gpibWrite(gpibId, "F4\r\n");// 4W Ohm
-    gpibWrite(gpibId, "RA\r\n");// Autorange
-    gpibWrite(gpibId, "N5\r\n");// 5 Digits
-    gpibWrite(gpibId, "Z1\r\n");// Auto zero ON
-    gpibWrite(gpibId, "D1\r\n");// Normal Display
-    gpibWrite(gpibId, "T1\r\n");// Internal Trigger
+    gpibWrite(gpibId, "F4");// 4W Ohm
+    gpibWrite(gpibId, "RA");// Autorange
+    gpibWrite(gpibId, "N5");// 5 Digits
+    gpibWrite(gpibId, "Z1");// Auto zero ON
+    gpibWrite(gpibId, "D1");// Normal Display
+    gpibWrite(gpibId, "T1");// Internal Trigger
     return NO_ERROR;
+}
+
+
+int
+Hp3478::initRvsTime() {
+    uint iErr = 0;
+    iErr |= gpibWrite(gpibId, "M00");// SRQ Disabled
+    iErr |= gpibWrite(gpibId, "F4"); // 4W Ohm
+    iErr |= gpibWrite(gpibId, "RA"); // Autorange
+    iErr |= gpibWrite(gpibId, "N5"); // 5 Digits
+    iErr |= gpibWrite(gpibId, "Z1"); // Auto zero ON
+    iErr |= gpibWrite(gpibId, "D1"); // Normal Display
+    iErr |= gpibWrite(gpibId, "T3"); // Single Trigger
+    if(iErr & ERR) {
+        QString sError;
+        sError = QString(Q_FUNC_INFO) + QString("GPIB Error in gpibWrite(): - Status= %1")
+                .arg(ThreadIbsta(), 4, 16, QChar('0'));
+        sError += ErrMsg(ThreadIbsta(), ThreadIberr(), ThreadIbcntl());
+        emit sendMessage(sError);
+        return -1;
+    }
 }
 
 

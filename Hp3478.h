@@ -40,6 +40,7 @@ public:
     int      init();
     void     onGpibCallback(int LocalUd, unsigned long LocalIbsta, unsigned long LocalIberr, long LocalIbcntl);
     int      endRvsTime();
+    int      initRvsTime();
 
 private:
     bool  myConfigure(QString sConf);
