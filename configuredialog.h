@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <QDialog>
 
+QT_FORWARD_DECLARE_CLASS(MainWindow)
 QT_FORWARD_DECLARE_CLASS(QTabWidget)
 QT_FORWARD_DECLARE_CLASS(QDialogButtonBox)
 QT_FORWARD_DECLARE_CLASS(K236Tab)
@@ -31,7 +32,7 @@ class ConfigureDialog : public QDialog
 {
     Q_OBJECT
 public:
-    explicit ConfigureDialog(int iConfiguration, bool enableMonochromator, QWidget *parent = nullptr);
+    explicit ConfigureDialog(int iConfiguration, bool enableMonochromator, MainWindow *parent = nullptr);
 
 signals:
 
@@ -50,6 +51,7 @@ public:
     FileTab  *pTabFile;
 
 private:
+    MainWindow       *pParent;
     QTabWidget       *pTabWidget;
     QDialogButtonBox *pButtonBox;
 

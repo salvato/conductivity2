@@ -55,6 +55,13 @@ public:
     static const int iConfLScan   = 3;
     static const int iConfRvsTime = 4;
 
+public:
+    bool             bUseMonochromator;
+    bool             bUseKeithley236;
+    bool             bUseLakeShore330;
+    bool             bUseHp3478;
+    bool             bUseGpio;
+
 signals:
 
 protected:
@@ -169,11 +176,6 @@ private:
     volatile bool    isK236ReadyForTrigger;
     bool             bRunning;
     int              junctionDirection;
-    bool             bUseMonochromator;
-    bool             bUseKeithley236;
-    bool             bUseLakeShore330;
-    bool             bUseHp3478;
-    bool             bUseGpio;
     int              gpioHostHandle;
     int              gpioLEDpin;
     double           sigmaDark;

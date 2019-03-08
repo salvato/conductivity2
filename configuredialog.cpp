@@ -23,28 +23,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "ls330tab.h"
 #include "cs130tab.h"
 #include "filetab.h"
+#include "mainwindow.h"
 
 #include <QTabWidget>
 #include <QDialogButtonBox>
 #include <QVBoxLayout>
 
 
-ConfigureDialog::ConfigureDialog(int iConfiguration, bool enableMonochromator, QWidget *parent)
+ConfigureDialog::ConfigureDialog(int iConfiguration, bool enableMonochromator, MainWindow *parent)
     : QDialog(parent)
+    , pTabK236(Q_NULLPTR)
+    , pTabLS330(Q_NULLPTR)
+    , pTabCS130(Q_NULLPTR)
+    , pTabFile(Q_NULLPTR)
+    , pParent(parent)
     , configurationType(iConfiguration)
     , bUseMonochromator(enableMonochromator)
 {
-    pTabK236  = new K236Tab(configurationType, this);
-    pTabLS330 = new LS330Tab(configurationType, this);
-    pTabCS130 = new CS130Tab(configurationType, bUseMonochromator, this);
-    pTabFile  = new FileTab(configurationType, this);
-
-    pTabWidget = new QTabWidget();
-
+    pTabWidget   = new QTabWidget();
+    pTabFile     = new FileTab(configurationType, this);
     iFileIndex   = pTabWidget->addTab(pTabFile,  tr("Out File"));
-    iSourceIndex = pTabWidget->addTab(pTabK236,  tr("K236"));
-    iThermIndex  = pTabWidget->addTab(pTabLS330, tr("LS330"));
-    iMonoIndex   = pTabWidget->addTab(pTabCS130, tr("CS130"));
+    if(pParent->bUseKeithley236) {
+        pTabK236  = new K236Tab(configurationType, this);
+        iSourceIndex = pTabWidget->addTab(pTabK236,  tr("K236"));
+    }
+    if(pParent->bUseLakeShore330) {
+        pTabLS330 = new LS330Tab(configurationType, this);
+        iThermIndex  = pTabWidget->addTab(pTabLS330, tr("LS330"));
+    }
+    if(pParent->bUseMonochromator) {
+        pTabCS130 = new CS130Tab(configurationType, bUseMonochromator, this);
+        iMonoIndex   = pTabWidget->addTab(pTabCS130, tr("CS130"));
+    }
 
     pButtonBox = new QDialogButtonBox(QDialogButtonBox::Ok |
                                       QDialogButtonBox::Cancel);
@@ -63,18 +73,13 @@ ConfigureDialog::ConfigureDialog(int iConfiguration, bool enableMonochromator, Q
         break;
     case MainWindow::iConfRvsTime:
         setWindowTitle("R versus Time");
-//        pTabLS330->setDisabled(true);
-        pTabCS130->setDisabled(true);
+        if(pTabLS330) pTabLS330->setDisabled(true);
+        if(pTabCS130) pTabCS130->setDisabled(true);
         break;
     case MainWindow::iConfLScan:
         setWindowTitle("Lambda Scan");
         break;
     default:
-        setWindowTitle("Unknown Measurement");
-        pTabFile->setDisabled(true);
-        pTabK236->setDisabled(true);
-        pTabLS330->setDisabled(true);
-        pTabCS130->setDisabled(true);
         reject();
     }
     connectSignals();
@@ -84,10 +89,10 @@ ConfigureDialog::ConfigureDialog(int iConfiguration, bool enableMonochromator, Q
 
 void
 ConfigureDialog::setToolTips() {
-    pTabWidget->setTabToolTip(iSourceIndex, QString("Source-Measure Unit configuration"));
-    pTabWidget->setTabToolTip(iThermIndex,  QString("Thermostat configuration"));
-    pTabWidget->setTabToolTip(iMonoIndex,   QString("Monochromator configuration"));
-    pTabWidget->setTabToolTip(iFileIndex,   QString("Output File configuration"));
+    if(pTabFile)  pTabWidget->setTabToolTip(iFileIndex,   QString("Output File configuration"));
+    if(pTabK236)  pTabWidget->setTabToolTip(iSourceIndex, QString("Source-Measure Unit configuration"));
+    if(pTabLS330) pTabWidget->setTabToolTip(iThermIndex,  QString("Thermostat configuration"));
+    if(pTabCS130) pTabWidget->setTabToolTip(iMonoIndex,   QString("Monochromator configuration"));
 }
 
 
@@ -102,10 +107,10 @@ ConfigureDialog::connectSignals() {
 
 void
 ConfigureDialog::onCancel() {
-    pTabK236->restoreSettings();
-    pTabLS330->restoreSettings();
-    pTabCS130->restoreSettings();
-    pTabFile->restoreSettings();
+    if(pTabK236)  pTabK236->restoreSettings();
+    if(pTabLS330) pTabLS330->restoreSettings();
+    if(pTabCS130) pTabCS130->restoreSettings();
+    if(pTabFile)  pTabFile->restoreSettings();
     reject();
 }
 
@@ -113,10 +118,10 @@ ConfigureDialog::onCancel() {
 void
 ConfigureDialog::onOk() {
     if(pTabFile->checkFileName()) {
-        pTabK236->saveSettings();
-        pTabLS330->saveSettings();
-        pTabCS130->saveSettings();
-        pTabFile->saveSettings();
+        if(pTabK236)  pTabK236->saveSettings();
+        if(pTabLS330) pTabLS330->saveSettings();
+        if(pTabCS130) pTabCS130->saveSettings();
+        if(pTabFile)  pTabFile->saveSettings();
         accept();
     }
     pTabWidget->setCurrentIndex(iFileIndex);
