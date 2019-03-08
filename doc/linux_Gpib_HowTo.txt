@@ -1,0 +1,86 @@
+
+
+Per il Raspberry:
+
+sudo apt-get install raspberrypi-kernel-headers
+
+
+Per Ubuntu:
+
+uname -a
+sudo apt install linux-image-4.4.0-101-generic
+sudo apt install linux-headers-4.4.0-101-generic
+
+
+Per tutti:
+
+sudo apt-get install build-essential texinfo texi2html libcwidget-dev
+sudo apt-get install libncurses5-dev libx11-dev binutils-dev bison 
+sudo apt-get install flex libusb-1.0-0 libusb-dev libmpfr-dev libexpat1-dev
+sudo apt-get install tofrodos subversion autoconf automake libtool
+sudo ldconfig
+mkdir linux-gpib
+cd linux-gpib
+svn checkout svn://svn.code.sf.net/p/linux-gpib/code/trunk linux-gpib-code
+cd linux-gpib-code/linux-gpib/
+./bootstrap
+./configure
+make
+sudo make install
+sudo modprobe ni_usb_gpib
+sudo gedit /etc/gpib.conf
+
+
+interface {
+	minor = 0	/* board index, minor = 0 uses /dev/gpib0, minor = 1 uses /dev/gpib1, etc. */
+	board_type = "ni_usb_b"	/* type of interface board being used */
+	name = "conductivity"	/* optional name, allows you to get a board descriptor using ibfind() */
+	pad = 0	/* primary address of interface             */
+	sad = 0	/* secondary address of interface           */
+	timeout = T30s	/* timeout for commands */
+	eos = 0x0a	/* EOS Byte, 0xa is newline and 0xd is carriage return */
+	set-reos = yes	/* Terminate read if EOS */
+	set-bin = no	/* Compare EOS 8-bit */
+	set-xeos = no	/* Assert EOI whenever EOS byte is sent */
+	set-eot = yes	/* Assert EOI with last byte on writes */
+	master = yes	/* interface board is system controller */
+}
+
+
+sudo gpib_config
+sudo addgroup rov gpib
+
+
+Per il Raspberry:
+
+sudo nano /etc/systemd/system/startGpibTimer.timer
+
+[Unit]
+Description=start GPIB after a given time from boot
+
+[Timer]
+OnBootSec=30
+Unit=startGpib.service
+
+[Install]
+WantedBy=multi-user.target
+
+
+sudo nano /etc/systemd/system/startGpib.service
+
+
+[Unit]
+Description=Start Gpib
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/gpib_config
+
+[Install]
+WantedBy=startGpibTimer.target
+
+
+
+systemctl enable startGpibTimer
+
+
