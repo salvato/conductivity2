@@ -91,7 +91,9 @@ linux {
 
 
 DISTFILES += doc/linux_Gpib_HowTo.txt \
-    doc/HP_3478a.pdf
+    doc/HP_3478a.pdf \
+    LICENSE \
+    README.md
 DISTFILES += doc/GPIBProgrammingReferenceManual.pdf
 DISTFILES += doc/Oriel-Cornerstone-130-User-Manual-RevA.pdf
 DISTFILES += doc/oriel_cornerstone_manual.pdf
