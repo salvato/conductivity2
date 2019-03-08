@@ -140,6 +140,16 @@ Hp3478::initRvsTime() {
         emit sendMessage(sError);
         return -1;
     }
+    iErr = gpibWrite(gpibId, "M75");// Enable SRQ
+    if(iErr & ERR) {
+        QString sError;
+        sError = QString(Q_FUNC_INFO) + QString("GPIB Error in gpibWrite(): - Status= %1")
+                .arg(ThreadIbsta(), 4, 16, QChar('0'));
+        sError += ErrMsg(ThreadIbsta(), ThreadIberr(), ThreadIbcntl());
+        emit sendMessage(sError);
+        return -1;
+    }
+    return NO_ERROR;
 }
 
 
@@ -148,112 +158,38 @@ Hp3478::onGpibCallback(int LocalUd, unsigned long LocalIbsta, unsigned long Loca
     Q_UNUSED(LocalIbsta)
     Q_UNUSED(LocalIberr)
     Q_UNUSED(LocalIbcntl)
-/*
-    if(msk == 0) {
-        errmsg("SRQService(HP34401): Stale Interrupt", Ibsta, Iberr, Ibcntl);
-        GpibError(LastError);
-        *RearmMask = msk;
-        return;
-    }
-    if(Ibsta & ERR) {
-        if(!(Iberr & ESRQ)) {
-            errmsg("SRQService(HP34401): Ibsta Error", Ibsta, Iberr, Ibcntl);
-            GpibError(LastError);
+
+    if(LocalIbsta & ERR) {
+        if(!(LocalIberr & ESRQ)) {
+            emit sendMessage(QString(Q_FUNC_INFO) + QString("SRQService(HP3478A): Ibsta Error %1"). arg(LocalIberr));
         }
     }
-    CHAR spb;
-    ibrsp(ud, &spb);
-    if (ThreadIbsta() & ERR) {
-        if(ThreadIberr() & ESTB) {
-            GpibError("HP34401 Data Lost!");
-        } else {
-            errmsg("SRQService(HP34401): ibrsp() Failed", ThreadIbsta(), ThreadIberr(), ThreadIbcntl());
-            GpibError(LastError);
-        }
-        *RearmMask = msk;
-        return;
+    if(ibrsp(LocalUd, &spollByte) & ERR) {
+        emit sendMessage(QString(Q_FUNC_INFO) + QString("GPIB error %1").arg(LocalIberr));
     }
-    strcpy(LastError, "NoError");
-    ibrd(ud, buf, sizeof(buf)-1);
-    if (ThreadIbsta() & ERR) {
-        errmsg("SRQService(HP34401): ibrd() Failed", ThreadIbsta(), ThreadIberr(), ThreadIbcntl());
-        GpibError(LastError);
-    } else {
-        buf[ThreadIbcnt()] = '\0';
-        x = atof(buf);
-        if (x > 1.0e12) {
-            x = 1.0e12;
+
+    if((spollByte & 1)){// Reading Done
+        sResponse = gpibRead(LocalUd);
+        if(sResponse != QString()) {
+            QDateTime currentTime = QDateTime::currentDateTime();
+            emit newReading(currentTime, sResponse);
         }
-        sprintf(cmd, "%g;%g", t-time0, x);
-        SendData(cmd);
     }
-*/
     hp3478::rearmMask = RQS;
 }
 
 
-/*
 bool
-Hp3478::myInit() {
-    ibclr(myUd);
-    if (ThreadIbsta() & ERR) {
-        errmsg("Connect(Hp3478): ibclr() Failed", ThreadIbsta(), ThreadIberr(), ThreadIbcntl());
-        GpibError(LastError);
+Hp3478::sendTrigger() {
+    ibtrg(gpibId);
+    if(isGpibError(QString(Q_FUNC_INFO) + "Trigger Error"))
         return false;
-    }
-    sprintf(command, "F4R2N5Z1D1T4\r\n");
-    gpibwrite(command);
-    if (ThreadIbsta() & ERR) {
-        errmsg("Connect(Hp3478): Configuration Failed", ThreadIbsta(), ThreadIberr(), ThreadIbcntl());
-        GpibError(LastError);
-        return false;
-    }
     return true;
 }
 
 
 bool
-Hp3478::AskVal(){
-    sprintf(command, "KM01T3\r\n");
-    gpibwrite(command);
-    if (ThreadIbsta() & ERR) {
-        errmsg("Connect(Hp3478): AskVal() Failed", ThreadIbsta(), ThreadIberr(), ThreadIbcntl());
-        GpibError(LastError);
-        return false;
-    }
-    msk = RQS;
+Hp3478::isReadyForTrigger() {
     return true;
 }
 
-
-bool
-Hp3478::myDisconnect() {
-    sprintf(command, "F4R2N5Z1D1T1\r\n");
-    gpibwrite(command);
-    if (ThreadIbsta() & ERR) {
-        errmsg("Connect(Hp3478): myDisconnect() Failed", ThreadIbsta(), ThreadIberr(), ThreadIbcntl());
-        GpibError(LastError);
-        return false;
-    }
-    return true;
-}
-
-
-void 
-Hp3478::SendData(char *message) {
-    pParent->SendMessage(HP3478_DATA, WPARAM(strlen(message)), LPARAM(message));
-}
-
-
-bool
-Hp3478::myConfigure(CString sConf){
-    sprintf(command, sConf);
-    gpibwrite(command);
-    if (ThreadIbsta() & ERR) {
-        errmsg("Connect(Hp3478): myConfigure() Failed", ThreadIbsta(), ThreadIberr(), ThreadIbcntl());
-        GpibError(LastError);
-        return false;
-    }
-    return true;
-}
-*/

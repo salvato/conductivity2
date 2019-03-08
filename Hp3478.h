@@ -33,6 +33,9 @@ public:
     explicit Hp3478(int gpio, int address, QObject *parent = Q_NULLPTR);
     virtual ~Hp3478();
 
+signals:
+    void     newReading(QDateTime currentTime, QString sReading);
+
 public slots:
     void     checkNotify();
 
@@ -41,12 +44,9 @@ public:
     void     onGpibCallback(int LocalUd, unsigned long LocalIbsta, unsigned long LocalIberr, long LocalIbcntl);
     int      endRvsTime();
     int      initRvsTime();
+    bool     sendTrigger();
+    bool     isReadyForTrigger();
 
 private:
-    bool  myConfigure(QString sConf);
-    bool  myInit();
-    bool  myDisconnect();
-    bool  myConnect();
-    void  SendData(char *message);
 };
 
