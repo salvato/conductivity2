@@ -74,14 +74,15 @@ MainWindow::MainWindow(int iBoard, QWidget *parent)
     // in the 40 pin GPIO connector.
 {
     // Init internal variables
-    gpibBoardID           = iBoard;
-    bUseMonochromator     = false;
-    gpioHostHandle        = -1;
-    presentMeasure        = NoMeasure;
-    bRunning              = false;
-    isK236ReadyForTrigger = false;
-    maxPlotPoints         = 3000;
-    wlResolution          = 5;// To be changed
+    gpibBoardID             = iBoard;
+    bUseMonochromator       = false;
+    gpioHostHandle          =-1;
+    presentMeasure          = NoMeasure;
+    bRunning                = false;
+    isK236ReadyForTrigger   = false;
+    isHp3478ReadyForTrigger = false;
+    maxPlotPoints           = 3000;
+    wlResolution            = 5;// To be changed
     // Prepare message logging
     sLogFileName = QString("gpibLog.txt");
     sLogDir = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
@@ -110,14 +111,14 @@ MainWindow::MainWindow(int iBoard, QWidget *parent)
 
 
 MainWindow::~MainWindow() {
-    if(pKeithley236 != Q_NULLPTR)      delete pKeithley236;
-    if(pLakeShore330 != Q_NULLPTR)     delete pLakeShore330;
-    if(pCornerStone130 != Q_NULLPTR)   delete pCornerStone130;
+    if(pKeithley236      != Q_NULLPTR) delete pKeithley236;
+    if(pLakeShore330     != Q_NULLPTR) delete pLakeShore330;
+    if(pCornerStone130   != Q_NULLPTR) delete pCornerStone130;
     if(pPlotMeasurements != Q_NULLPTR) delete pPlotMeasurements;
-    if(pPlotTemperature != Q_NULLPTR)  delete pPlotTemperature;
-    if(pConfigureDialog!= Q_NULLPTR)   delete pConfigureDialog;
-    if(pOutputFile != Q_NULLPTR)       delete pOutputFile;
-    if(pLogFile != Q_NULLPTR)          delete pLogFile;
+    if(pPlotTemperature  != Q_NULLPTR) delete pPlotTemperature;
+    if(pConfigureDialog  != Q_NULLPTR) delete pConfigureDialog;
+    if(pOutputFile       != Q_NULLPTR) delete pOutputFile;
+    if(pLogFile          != Q_NULLPTR) delete pLogFile;
     delete ui;
 }
 
@@ -144,14 +145,25 @@ MainWindow::closeEvent(QCloseEvent *event) {
             pOutputFile->deleteLater();
             pOutputFile = Q_NULLPTR;
         }
-        if(pKeithley236)
+        if(pKeithley236) {
             pKeithley236->endVvsT();
+        }
+        if(pHp3478) {
+            pHp3478->endRvsTime();
+            delete pHp3478;
+        }
         if(pLakeShore330) {
             if(pLakeShore330->isRamping())
                 pLakeShore330->stopRamp();
             pLakeShore330->switchPowerOff();
+            delete pLakeShore330;
         }
     }
+    if(pKeithley236)    delete pKeithley236;
+    if(pHp3478)         delete pHp3478;
+    if(pLakeShore330)   delete pLakeShore330;
+    if(pCornerStone130) delete pCornerStone130;
+
 #if defined(Q_PROCESSOR_ARM)
     if(gpioHostHandle >= 0)
         pigpio_stop(gpioHostHandle);
@@ -389,34 +401,35 @@ MainWindow::checkInstruments() {
         }
     }
     bUseKeithley236 = pKeithley236 != Q_NULLPTR;
-
-    // Check for the Hp 3478A
-    sCommand = "S";// Read the Front/Rear switch status (hopefully understood only by the HP3478A)
-    for(int i=0; i<nDevices; i++) {
-        if(resultlist[i] == cornerstoneId) continue;
-        if(resultlist[i] == lakeShoreID) continue;
-        if(resultlist[i] == Keithley236ID) continue;
-        DevClear(gpibBoardID, resultlist[i]);
-        Send(gpibBoardID, resultlist[i], sCommand.toUtf8().constData(), sCommand.length(), DABend);
-        Receive(gpibBoardID, resultlist[i], readBuf, 256, STOPend);
-        readBuf[ThreadIbcnt()] = '\0';
-        sInstrumentID = QString(readBuf);
-#if defined(MY_DEBUG)
-        logMessage(QString("Address= %1 - InstrumentID= %2")
-                   .arg(resultlist[i])
-                   .arg(sInstrumentID));
-#endif
-        if((sInstrumentID.left(1) == QString("0")) ||
-           (sInstrumentID.left(1) == QString("1")))
-        {
-            if(pHp3478 == Q_NULLPTR) {
-                pHp3478 = new Hp3478(gpibBoardID, resultlist[i], this);
-                connect(pHp3478, SIGNAL(sendMessage(QString)),
-                        this, SLOT(onLogMessage(QString)));
+    if(!bUseKeithley236) {// If connected, it is the instrument we will use !
+        // Check for the Hp 3478A
+        sCommand = "S";// Read the Front/Rear switch status (hopefully understood only by the HP3478A)
+        for(int i=0; i<nDevices; i++) {
+            if(resultlist[i] == cornerstoneId) continue;
+            if(resultlist[i] == lakeShoreID) continue;
+            if(resultlist[i] == Keithley236ID) continue;
+            DevClear(gpibBoardID, resultlist[i]);
+            Send(gpibBoardID, resultlist[i], sCommand.toUtf8().constData(), sCommand.length(), DABend);
+            Receive(gpibBoardID, resultlist[i], readBuf, 256, STOPend);
+            readBuf[ThreadIbcnt()] = '\0';
+            sInstrumentID = QString(readBuf);
+    #if defined(MY_DEBUG)
+            logMessage(QString("Address= %1 - InstrumentID= %2")
+                       .arg(resultlist[i])
+                       .arg(sInstrumentID));
+    #endif
+            if((sInstrumentID.left(1) == QString("0")) ||
+               (sInstrumentID.left(1) == QString("1")))
+            {
+                if(pHp3478 == Q_NULLPTR) {
+                    pHp3478 = new Hp3478(gpibBoardID, resultlist[i], this);
+                    connect(pHp3478, SIGNAL(sendMessage(QString)),
+                            this, SLOT(onLogMessage(QString)));
+                }
+                break;
             }
-            break;
         }
-    }
+    }// if(!bUseKeithley236)
     bUseHp3478 = pHp3478 != Q_NULLPTR;
 
     // Initialize the GPIO handler
@@ -565,7 +578,7 @@ MainWindow::on_startRvsTButton_clicked() {
     }
     // else
     if(pConfigureDialog) delete pConfigureDialog;
-    pConfigureDialog = new ConfigureDialog(iConfRvsT, bUseMonochromator, this);
+    pConfigureDialog = new ConfigureDialog(iConfRvsT, this);
     if(pConfigureDialog->exec() == QDialog::Rejected)
         return;
     QApplication::setOverrideCursor(QCursor(Qt::BusyCursor));
@@ -727,7 +740,11 @@ MainWindow::stopRvsTime() {
     }
     if(pKeithley236 != Q_NULLPTR) {
         pKeithley236->disconnect();
-        pKeithley236->endVvsT();
+        pKeithley236->endVvsTime();
+    }
+    if(pHp3478 != Q_NULLPTR) {
+        pHp3478->disconnect();
+        pHp3478->endRvsTime();
     }
     if(pLakeShore330 != Q_NULLPTR) {
         if(pLakeShore330->isRamping())
@@ -756,27 +773,46 @@ MainWindow::on_startRvsTimeButton_clicked() {
     }
     // else
     if(pConfigureDialog) delete pConfigureDialog;
-    pConfigureDialog = new ConfigureDialog(iConfRvsTime, bUseMonochromator, this);
+    pConfigureDialog = new ConfigureDialog(iConfRvsTime, this);
     if(pConfigureDialog->exec() == QDialog::Rejected)
         return;
     QApplication::setOverrideCursor(QCursor(Qt::BusyCursor));
     switchLampOff();
-    // Initializing Keithley 236
-    ui->statusBar->showMessage("Initializing Keithley 236...");
-    if(pKeithley236->init()) {
-        ui->statusBar->showMessage("Unable to Initialize Keithley 236...");
-        QApplication::restoreOverrideCursor();
-        return;
+
+    if(pKeithley236) {
+        // Initializing Keithley 236
+        ui->statusBar->showMessage("Initializing Keithley 236...");
+        if(pKeithley236->init()) {
+            ui->statusBar->showMessage("Unable to Initialize Keithley 236...");
+            QApplication::restoreOverrideCursor();
+            return;
+        }
+        isK236ReadyForTrigger = false;
+        connect(pKeithley236, SIGNAL(complianceEvent()),
+                this, SLOT(onComplianceEvent()));
+        connect(pKeithley236, SIGNAL(clearCompliance()),
+                this, SLOT(onClearComplianceEvent()));
+        connect(pKeithley236, SIGNAL(readyForTrigger()),
+                this, SLOT(onKeithleyReadyForTrigger()));
+        connect(pKeithley236, SIGNAL(newReading(QDateTime, QString)),
+                this, SLOT(onNewRvsTimeKeithleyReading(QDateTime, QString)));
+    }// if(pKeithley236)
+
+    if(pHp3478) {
+        // Initializing HP3478A
+        ui->statusBar->showMessage("Initializing HP 3478A...");
+        if(pHp3478->init()) {
+            ui->statusBar->showMessage("Unable to Initialize HP 3478A...");
+            QApplication::restoreOverrideCursor();
+            return;
+        }
+        isHp3478ReadyForTrigger = false;
+        connect(pHp3478, SIGNAL(readyForTrigger()),
+                this, SLOT(onHp3478ReadyForTrigger()));
+        connect(pHp3478, SIGNAL(newReading(QDateTime, QString)),
+                this, SLOT(onNewRvsTimeHp3478Reading(QDateTime, QString)));
     }
-    isK236ReadyForTrigger = false;
-    connect(pKeithley236, SIGNAL(complianceEvent()),
-            this, SLOT(onComplianceEvent()));
-    connect(pKeithley236, SIGNAL(clearCompliance()),
-            this, SLOT(onClearComplianceEvent()));
-    connect(pKeithley236, SIGNAL(readyForTrigger()),
-            this, SLOT(onKeithleyReadyForTrigger()));
-    connect(pKeithley236, SIGNAL(newReading(QDateTime, QString)),
-            this, SLOT(onNewRvsTimeKeithleyReading(QDateTime, QString)));
+
     // Initializing LakeShore 330
     ui->statusBar->showMessage("Initializing LakeShore 330...");
     if(pLakeShore330->init()) {
@@ -881,7 +917,7 @@ MainWindow::on_startIvsVButton_clicked() {
     }
     //else
     if(pConfigureDialog) delete pConfigureDialog;
-    pConfigureDialog = new ConfigureDialog(iConfIvsV, bUseMonochromator, this);
+    pConfigureDialog = new ConfigureDialog(iConfIvsV, this);
     if(pConfigureDialog->exec() == QDialog::Rejected)
         return;
     QApplication::setOverrideCursor(QCursor(Qt::BusyCursor));
@@ -1041,7 +1077,7 @@ MainWindow::on_lambdaScanButton_clicked() {
     }
     // else
     if(pConfigureDialog) delete pConfigureDialog;
-    pConfigureDialog = new ConfigureDialog(iConfLScan, bUseMonochromator, this);
+    pConfigureDialog = new ConfigureDialog(iConfLScan, this);
     if(pConfigureDialog->exec() == QDialog::Rejected)
         return;
     QApplication::setOverrideCursor(QCursor(Qt::BusyCursor));

@@ -39,6 +39,7 @@ myCallback(int LocalUd, unsigned long LocalIbsta, unsigned long LocalIberr, long
 Hp3478::Hp3478(int gpio, int address, QObject *parent)
     : GpibDevice(gpio, address, parent)
 {
+    pollInterval = 569;
 }
 
 
@@ -65,7 +66,7 @@ Hp3478::init(){
     }
     short listen;
     ibln(gpibNumber, gpibAddress, NO_SAD, &listen);
-    if(isGpibError(QString(Q_FUNC_INFO) + "Keithley 236 Not Respondig"))
+    if(isGpibError(QString(Q_FUNC_INFO) + "Hp 3478A Not Respondig"))
         return GPIB_DEVICE_NOT_PRESENT;
     if(listen == 0) {
         ibonl(gpibId, 0);
@@ -80,13 +81,43 @@ Hp3478::init(){
 #else
     ibnotify(gpibId,
              RQS,
-             (GpibNotifyCallback_t) keithley236::myCallback,
+             (GpibNotifyCallback_t) hp3478::myCallback,
              this);
     if(isGpibError(QString(Q_FUNC_INFO) + "ibnotify call failed."))
         return -1;
 #endif
     ibclr(gpibId);
     QThread::sleep(1);
+    return NO_ERROR;
+}
+
+
+void
+Hp3478::checkNotify() {
+#if defined(Q_OS_LINUX)
+    ibrsp(gpibId, &spollByte);
+    if(isGpibError(QString(Q_FUNC_INFO) + "ibrsp() Error"))
+    if(!(spollByte & 64))
+        return; // SRQ not enabled
+    onGpibCallback(gpibId, uint(ThreadIbsta()), uint(ThreadIberr()), ThreadIbcnt());
+#endif
+}
+
+
+int
+Hp3478::endRvsTime() {
+#if defined(Q_OS_LINUX)
+    pollTimer.stop();
+    pollTimer.disconnect();
+#else
+    ibnotify(gpibId, 0, NULL, NULL);// disable notification
+#endif
+    gpibWrite(gpibId, "F4\r\n");// 4W Ohm
+    gpibWrite(gpibId, "RA\r\n");// Autorange
+    gpibWrite(gpibId, "N5\r\n");// 5 Digits
+    gpibWrite(gpibId, "Z1\r\n");// Auto zero ON
+    gpibWrite(gpibId, "D1\r\n");// Normal Display
+    gpibWrite(gpibId, "T1\r\n");// Internal Trigger
     return NO_ERROR;
 }
 

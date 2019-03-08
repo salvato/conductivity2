@@ -33,10 +33,13 @@ public:
     explicit Hp3478(int gpio, int address, QObject *parent = Q_NULLPTR);
     virtual ~Hp3478();
 
+public slots:
+    void     checkNotify();
+
 public:
     int      init();
     void     onGpibCallback(int LocalUd, unsigned long LocalIbsta, unsigned long LocalIberr, long LocalIbcntl);
-    bool     AskVal();
+    int      endRvsTime();
 
 private:
     bool  myConfigure(QString sConf);

@@ -205,12 +205,18 @@ Keithley236::endVvsT() {
     pollTimer.stop();
     pollTimer.disconnect();
 #else
-    ibnotify (gpibId, 0, NULL, NULL);// disable notification
+    ibnotify(gpibId, 0, NULL, NULL);// disable notification
 #endif
     gpibWrite(gpibId, "M0,0X");      // SRQ Disabled, SRQ on Compliance
     gpibWrite(gpibId, "R0");         // Disarm Trigger
     gpibWrite(gpibId, "N0X");        // Place in Stand By
     return NO_ERROR;
+}
+
+
+int
+Keithley236::endVvsTime() {
+    return endVvsT();
 }
 
 

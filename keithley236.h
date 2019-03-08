@@ -39,6 +39,7 @@ public:
     int      initVvsTSourceI(double dAppliedCurrent, double dCompliance);
     int      initVvsTSourceV(double dAppliedVoltage, double dCompliance);
     int      endVvsT();
+    int      endVvsTime();
     void     onGpibCallback(int ud, unsigned long ibsta, unsigned long iberr, long ibcntl);
     int      junctionCheck(double v1, double v2);
     bool     initISweep(double startCurrent, double stopCurrent, double currentStep, double delay, double voltageCompliance);

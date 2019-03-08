@@ -174,6 +174,7 @@ private:
     QString          sTemperaturePlotLabel;
     int              maxPlotPoints;
     volatile bool    isK236ReadyForTrigger;
+    volatile bool    isHp3478ReadyForTrigger;
     bool             bRunning;
     int              junctionDirection;
     int              gpioHostHandle;

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <QVBoxLayout>
 
 
-ConfigureDialog::ConfigureDialog(int iConfiguration, bool enableMonochromator, MainWindow *parent)
+ConfigureDialog::ConfigureDialog(int iConfiguration, MainWindow *parent)
     : QDialog(parent)
     , pTabK236(Q_NULLPTR)
     , pTabLS330(Q_NULLPTR)
@@ -38,7 +38,6 @@ ConfigureDialog::ConfigureDialog(int iConfiguration, bool enableMonochromator, M
     , pTabFile(Q_NULLPTR)
     , pParent(parent)
     , configurationType(iConfiguration)
-    , bUseMonochromator(enableMonochromator)
 {
     pTabWidget   = new QTabWidget();
     pTabFile     = new FileTab(configurationType, this);
@@ -52,7 +51,7 @@ ConfigureDialog::ConfigureDialog(int iConfiguration, bool enableMonochromator, M
         iThermIndex  = pTabWidget->addTab(pTabLS330, tr("LS330"));
     }
     if(pParent->bUseMonochromator) {
-        pTabCS130 = new CS130Tab(configurationType, bUseMonochromator, this);
+        pTabCS130 = new CS130Tab(configurationType, pParent->bUseMonochromator, this);
         iMonoIndex   = pTabWidget->addTab(pTabCS130, tr("CS130"));
     }
 
