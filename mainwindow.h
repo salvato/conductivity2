@@ -67,7 +67,8 @@ signals:
 protected:
     void closeEvent(QCloseEvent *event) Q_DECL_OVERRIDE;
     void stopTimers();
-    bool getNewMeasure();
+    bool getNewK236Measure();
+    bool getNewHp3478Measure();
     void initTemperaturePlot();
     void writeRvsTHeader();
     void initRvsTPlots();
@@ -99,7 +100,7 @@ private slots:
     void onTimerStabilizeT();
     void onSteadyTReached();
     void onTimeToReadT();
-    void onTimeToGetNewMeasure();
+    void onTimeToGetNewK236Measure();
     void onComplianceEvent();
     void onClearComplianceEvent();
     void onKeithleyReadyForTrigger();
@@ -107,6 +108,7 @@ private slots:
     void onNewRvsTimeKeithleyReading(QDateTime dataTime, QString sDataRead);
     void onNewRvsTimeHp3478Reading(QDateTime, QString);
     void onHp3478ReadyForTrigger();
+    void onTimeToGetNewHp3478Measure();
     void onNewLambdaScanKeithleyReading(QDateTime dataTime, QString sDataRead);
     bool onKeithleyReadyForSweepTrigger();
     void onKeithleySweepDone(QDateTime dataTime, QString sData);

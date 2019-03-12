@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "configuredialog.h"
 
 #include "k236tab.h"
+#include "hp3478tab.h"
 #include "ls330tab.h"
 #include "cs130tab.h"
 #include "filetab.h"
@@ -33,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ConfigureDialog::ConfigureDialog(int iConfiguration, MainWindow *parent)
     : QDialog(parent)
     , pTabK236(Q_NULLPTR)
+    , pTabHp3478(Q_NULLPTR)
     , pTabLS330(Q_NULLPTR)
     , pTabCS130(Q_NULLPTR)
     , pTabFile(Q_NULLPTR)
@@ -45,6 +47,10 @@ ConfigureDialog::ConfigureDialog(int iConfiguration, MainWindow *parent)
     if(pParent->bUseKeithley236) {
         pTabK236  = new K236Tab(configurationType, this);
         iSourceIndex = pTabWidget->addTab(pTabK236,  tr("K236"));
+    }
+    if(pParent->bUseHp3478) {
+        pTabHp3478  = new hp3478Tab(configurationType, this);
+        iSourceIndex = pTabWidget->addTab(pTabHp3478,  tr("Hp3478A"));
     }
     if(pParent->bUseLakeShore330) {
         pTabLS330 = new LS330Tab(configurationType, this);
@@ -88,10 +94,11 @@ ConfigureDialog::ConfigureDialog(int iConfiguration, MainWindow *parent)
 
 void
 ConfigureDialog::setToolTips() {
-    if(pTabFile)  pTabWidget->setTabToolTip(iFileIndex,   QString("Output File configuration"));
-    if(pTabK236)  pTabWidget->setTabToolTip(iSourceIndex, QString("Source-Measure Unit configuration"));
-    if(pTabLS330) pTabWidget->setTabToolTip(iThermIndex,  QString("Thermostat configuration"));
-    if(pTabCS130) pTabWidget->setTabToolTip(iMonoIndex,   QString("Monochromator configuration"));
+    if(pTabFile)   pTabWidget->setTabToolTip(iFileIndex,   QString("Output File configuration"));
+    if(pTabK236)   pTabWidget->setTabToolTip(iSourceIndex, QString("Source-Measure Unit configuration"));
+    if(pTabHp3478) pTabWidget->setTabToolTip(iSourceIndex, QString("Hp3478A configuration"));
+    if(pTabLS330)  pTabWidget->setTabToolTip(iThermIndex,  QString("Thermostat configuration"));
+    if(pTabCS130)  pTabWidget->setTabToolTip(iMonoIndex,   QString("Monochromator configuration"));
 }
 
 
@@ -106,10 +113,11 @@ ConfigureDialog::connectSignals() {
 
 void
 ConfigureDialog::onCancel() {
-    if(pTabK236)  pTabK236->restoreSettings();
-    if(pTabLS330) pTabLS330->restoreSettings();
-    if(pTabCS130) pTabCS130->restoreSettings();
-    if(pTabFile)  pTabFile->restoreSettings();
+    if(pTabK236)   pTabK236->restoreSettings();
+    if(pTabHp3478) pTabHp3478->restoreSettings();
+    if(pTabLS330)  pTabLS330->restoreSettings();
+    if(pTabCS130)  pTabCS130->restoreSettings();
+    if(pTabFile)   pTabFile->restoreSettings();
     reject();
 }
 
@@ -117,10 +125,11 @@ ConfigureDialog::onCancel() {
 void
 ConfigureDialog::onOk() {
     if(pTabFile->checkFileName()) {
-        if(pTabK236)  pTabK236->saveSettings();
-        if(pTabLS330) pTabLS330->saveSettings();
-        if(pTabCS130) pTabCS130->saveSettings();
-        if(pTabFile)  pTabFile->saveSettings();
+        if(pTabK236)   pTabK236->saveSettings();
+        if(pTabHp3478) pTabHp3478->saveSettings();
+        if(pTabLS330)  pTabLS330->saveSettings();
+        if(pTabCS130)  pTabCS130->saveSettings();
+        if(pTabFile)   pTabFile->saveSettings();
         accept();
     }
     pTabWidget->setCurrentIndex(iFileIndex);

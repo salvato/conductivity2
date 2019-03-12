@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "ui_mainwindow.h"
 
 #include "k236tab.h"
+#include "hp3478tab.h"
 #include "ls330tab.h"
 #include "cs130tab.h"
 #include "filetab.h"
@@ -49,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <QStandardPaths>
 #include <QDebug>
 
-#define MY_DEBUG
+//#define MY_DEBUG
 
 MainWindow::MainWindow(int iBoard, QWidget *parent)
     : QMainWindow(parent)
@@ -82,7 +83,8 @@ MainWindow::MainWindow(int iBoard, QWidget *parent)
     isK236ReadyForTrigger   = false;
     isHp3478ReadyForTrigger = false;
     maxPlotPoints           = 3000;
-    wlResolution            = 5;// To be changed
+    wlResolution            = 5;// Wavelength steps. To be changed
+
     // Prepare message logging
     sLogFileName = QString("gpibLog.txt");
     sLogDir = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
@@ -91,6 +93,7 @@ MainWindow::MainWindow(int iBoard, QWidget *parent)
 #ifndef MY_DEBUG
     prepareLogFile();
 #endif
+
     // Setup User Interface
     ui->setupUi(this);
     // Remove the resize-handle in the lower right corner
@@ -98,11 +101,13 @@ MainWindow::MainWindow(int iBoard, QWidget *parent)
     // Make the size of the window fixed
     setFixedSize(size());
     setWindowIcon(QIcon("qrc:/myLogoT.png"));
+
     // Setup the QLineEdit styles
     sNormalStyle = ui->labelCompliance->styleSheet();
     sErrorStyle  = "QLabel { color: rgb(255, 255, 255); background: rgb(255, 0, 0); selection-background-color: rgb(128, 128, 255); }";
     sDarkStyle   = "QLabel { color: rgb(255, 255, 255); background: rgb(0, 0, 0); selection-background-color: rgb(128, 128, 255); }";
     sPhotoStyle  = "QLabel { color: rgb(0, 0, 0); background: rgb(255, 255, 0); selection-background-color: rgb(128, 128, 255); }";
+
     // Restore Geometry and State of the window
     QSettings settings;
     restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
@@ -112,6 +117,7 @@ MainWindow::MainWindow(int iBoard, QWidget *parent)
 
 MainWindow::~MainWindow() {
     if(pKeithley236      != Q_NULLPTR) delete pKeithley236;
+    if(pHp3478           != Q_NULLPTR) delete pHp3478;
     if(pLakeShore330     != Q_NULLPTR) delete pLakeShore330;
     if(pCornerStone130   != Q_NULLPTR) delete pCornerStone130;
     if(pPlotMeasurements != Q_NULLPTR) delete pPlotMeasurements;
@@ -150,19 +156,22 @@ MainWindow::closeEvent(QCloseEvent *event) {
         }
         if(pHp3478) {
             pHp3478->endRvsTime();
-            delete pHp3478;
         }
         if(pLakeShore330) {
             if(pLakeShore330->isRamping())
                 pLakeShore330->stopRamp();
             pLakeShore330->switchPowerOff();
-            delete pLakeShore330;
         }
     }
     if(pKeithley236)    delete pKeithley236;
     if(pHp3478)         delete pHp3478;
     if(pLakeShore330)   delete pLakeShore330;
     if(pCornerStone130) delete pCornerStone130;
+
+    pKeithley236    = Q_NULLPTR;
+    pHp3478         = Q_NULLPTR;
+    pLakeShore330   = Q_NULLPTR;
+    pCornerStone130 = Q_NULLPTR;
 
 #if defined(Q_PROCESSOR_ARM)
     if(gpioHostHandle >= 0)
@@ -172,6 +181,8 @@ MainWindow::closeEvent(QCloseEvent *event) {
         if(pLogFile->isOpen()) {
             pLogFile->flush();
         }
+        pLogFile->deleteLater();
+        pLogFile = Q_NULLPTR;
     }
 }
 
@@ -779,8 +790,7 @@ MainWindow::on_startRvsTimeButton_clicked() {
     QApplication::setOverrideCursor(QCursor(Qt::BusyCursor));
     switchLampOff();
 
-    if(pKeithley236) {
-        // Initializing Keithley 236
+    if(pKeithley236) {// Initializing Keithley 236
         ui->statusBar->showMessage("Initializing Keithley 236...");
         if(pKeithley236->init()) {
             ui->statusBar->showMessage("Unable to Initialize Keithley 236...");
@@ -798,8 +808,7 @@ MainWindow::on_startRvsTimeButton_clicked() {
                 this, SLOT(onNewRvsTimeKeithleyReading(QDateTime, QString)));
     }// if(pKeithley236)
 
-    if(pHp3478) {
-        // Initializing HP3478A
+    if(pHp3478) {// Initializing HP3478A
         ui->statusBar->showMessage("Initializing HP 3478A...");
         if(pHp3478->init()) {
             ui->statusBar->showMessage("Unable to Initialize HP 3478A...");
@@ -833,10 +842,12 @@ MainWindow::on_startRvsTimeButton_clicked() {
         QApplication::restoreOverrideCursor();
         return;
     }
-    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>writeRvsTimeHeader();
+    writeRvsTimeHeader();
+
     // Init the Plots
     initRvsTimePlots();
 
+    double timeBetweenMeasurements = 10.0;
     if(pKeithley236) {
         // Configure Source-Measure Unit
         double dCompliance = pConfigureDialog->pTabK236->dCompliance;
@@ -850,12 +861,18 @@ MainWindow::on_startRvsTimeButton_clicked() {
             double dAppliedVoltage = pConfigureDialog->pTabK236->dStart;
             pKeithley236->initVvsTSourceV(dAppliedVoltage, dCompliance);
         }
+        timeBetweenMeasurements = pConfigureDialog->pTabK236->dInterval*1000.0;
+        connect(&measuringTimer, SIGNAL(timeout()),
+                this, SLOT(onTimeToGetNewK236Measure()));
     }
 
     if(pHp3478) {
         // Configure Multimeter
         presentMeasure = RvsTimeSourceI;
         pHp3478->initRvsTime();
+        timeBetweenMeasurements = pConfigureDialog->pTabHp3478->dInterval*1000.0;
+        connect(&measuringTimer, SIGNAL(timeout()),
+                this, SLOT(onTimeToGetNewHp3478Measure()));
     }
 
     // Configure the needed timers
@@ -875,27 +892,17 @@ MainWindow::on_startRvsTimeButton_clicked() {
             }
         }
     }
-/*
     ui->startRvsTButton->setDisabled(true);
     ui->startIvsVButton->setDisabled(true);
     ui->startRvsTimeButton->setText("Stop R vs Time");
     ui->lambdaScanButton->setDisabled(true);
     ui->lampButton->setDisabled(true);
     bRunning = true;
-    double timeBetweenMeasurements = pConfigureDialog->pTabK236->dInterval*1000.0;
-    connect(&measuringTimer, SIGNAL(timeout()),
-            this, SLOT(onTimeToGetNewMeasure()));
+    // Start the measuring cycle
     measuringTimer.start(int(timeBetweenMeasurements));
-*/
     dateStart = QDateTime::currentDateTime();
     ui->statusBar->showMessage(QString("%1 Measure started")
                                .arg(dateStart.toString()));
-}
-
-
-void
-MainWindow::onHp3478ReadyForTrigger() {
-
 }
 
 
@@ -904,27 +911,37 @@ MainWindow::writeRvsTimeHeader() {
     // Write the header
     // To cope with the GnuPlot way to handle the comment lines
     // we need a # as a first chraracter in each row.
-    pOutputFile->write(QString("%1 %2 %3 %4\n")
-                       .arg("#Time[s]", 12)
-                       .arg("V[V]", 12)
-                       .arg("I[A]", 12)
-                       .arg("T[K]", 12)
-                       .toLocal8Bit());
+    if(bUseKeithley236) {
+        pOutputFile->write(QString("%1 %2 %3 %4\n")
+                           .arg("#Time[s]", 12)
+                           .arg("V[V]", 12)
+                           .arg("I[A]", 12)
+                           .arg("T[K]", 12)
+                           .toLocal8Bit());
+        if(pConfigureDialog->pTabK236->bSourceI) {
+            pOutputFile->write(QString("# Current=%1[A] Compliance=%2[V]\n")
+                               .arg(pConfigureDialog->pTabK236->dStart)
+                               .arg(pConfigureDialog->pTabK236->dCompliance).toLocal8Bit());
+        }
+        else {
+            pOutputFile->write(QString("# Voltage=%1[V] Compliance=%2[A]\n")
+                               .arg(pConfigureDialog->pTabK236->dStart)
+                               .arg(pConfigureDialog->pTabK236->dCompliance).toLocal8Bit());
+        }
+    }
+    else if(bUseHp3478) {
+        pOutputFile->write(QString("%1 %2 %3\n")
+                           .arg("#Time[s]", 12)
+                           .arg("R[Ohm]", 12)
+                           .arg("T[K]", 12)
+                           .toLocal8Bit());
+    }
+
     QStringList HeaderLines = pConfigureDialog->pTabFile->sSampleInfo.split("\n");
     for(int i=0; i<HeaderLines.count(); i++) {
         pOutputFile->write("# ");
         pOutputFile->write(HeaderLines.at(i).toLocal8Bit());
         pOutputFile->write("\n");
-    }
-    if(pConfigureDialog->pTabK236->bSourceI) {
-        pOutputFile->write(QString("# Current=%1[A] Compliance=%2[V]\n")
-                           .arg(pConfigureDialog->pTabK236->dStart)
-                           .arg(pConfigureDialog->pTabK236->dCompliance).toLocal8Bit());
-    }
-    else {
-        pOutputFile->write(QString("# Voltage=%1[V] Compliance=%2[A]\n")
-                           .arg(pConfigureDialog->pTabK236->dStart)
-                           .arg(pConfigureDialog->pTabK236->dCompliance).toLocal8Bit());
     }
     pOutputFile->flush();
 }
@@ -1211,7 +1228,7 @@ MainWindow::on_lambdaScanButton_clicked() {
     else {
         double timeBetweenMeasurements = pConfigureDialog->pTabK236->dInterval*1000.0;
         connect(&measuringTimer, SIGNAL(timeout()),
-                this, SLOT(onTimeToGetNewMeasure()));
+                this, SLOT(onTimeToGetNewK236Measure()));
         measuringTimer.start(int(timeBetweenMeasurements));
         ui->statusBar->showMessage(QString("λ Scan Started: Please wait"));
 
@@ -1433,11 +1450,11 @@ MainWindow::initRvsTimePlots() {
     pPlotMeasurements->setMaxPoints(maxPlotPoints);
     pPlotMeasurements->SetLimits(0.0, 1.0, 0.1, 1.0, true, true, false, false);
     // Dataset
-    pPlotMeasurements->NewDataSet(iPlotDark,//Id
-                                  3, //Pen Width
+    pPlotMeasurements->NewDataSet(iPlotDark,           //Id
+                                  3,                   //Pen Width
                                   QColor(255, 255, 64),// Color
-                                  Plot2D::ipoint,// Symbol
-                                  "R(t)"// Title
+                                  Plot2D::ipoint,      // Symbol
+                                  "R(t)"               // Title
                        );
     pPlotMeasurements->SetShowDataSet(iPlotDark, true);
     pPlotMeasurements->SetShowTitle(iPlotDark, true);
@@ -1637,7 +1654,7 @@ MainWindow::onTimerStabilizeT() {
     iCurrentTPlot = 2;
     ui->statusBar->showMessage(QString("Thermal Stabilization Reached: Measure Started"));
     connect(&measuringTimer, SIGNAL(timeout()),
-            this, SLOT(onTimeToGetNewMeasure()));
+            this, SLOT(onTimeToGetNewK236Measure()));
     if((presentMeasure==RvsTSourceI)||
         (presentMeasure==RvsTSourceV)) {
         if(!pLakeShore330->startRamp(pConfigureDialog->pTabLS330->dTStop, pConfigureDialog->pTabLS330->dTRate)) {
@@ -1661,8 +1678,8 @@ MainWindow::onTimerStabilizeT() {
 
 // ToDo: Change Name (onTimeToGetNewRamp ?)
 void
-MainWindow::onTimeToGetNewMeasure() {
-    getNewMeasure();
+MainWindow::onTimeToGetNewK236Measure() {
+    getNewK236Measure();
     if((presentMeasure==RvsTSourceI) ||
        (presentMeasure==RvsTSourceV))
     {
@@ -1673,6 +1690,12 @@ MainWindow::onTimeToGetNewMeasure() {
             return;
         }
     }
+}
+
+
+void
+MainWindow::onTimeToGetNewHp3478Measure() {
+    getNewHp3478Measure();
 }
 
 
@@ -1710,6 +1733,12 @@ MainWindow::onClearComplianceEvent() {
 void
 MainWindow::onKeithleyReadyForTrigger() {
     isK236ReadyForTrigger = true;
+}
+
+
+void
+MainWindow::onHp3478ReadyForTrigger() {
+    isHp3478ReadyForTrigger = true;
 }
 
 
@@ -1761,11 +1790,30 @@ MainWindow::onNewRvsTKeithleyReading(QDateTime dataTime, QString sDataRead) {
     }
 }
 
+
 void
 MainWindow::onNewRvsTimeHp3478Reading(QDateTime dateTime, QString sDataRead) {
     double resistance, elapsedTime;
     resistance = sDataRead.toDouble();
     elapsedTime = double(dateStart.secsTo(dateTime));
+    if(bUseLakeShore330) {
+        currentTemperature = pLakeShore330->getTemperature();
+        ui->temperatureEdit->setText(QString("%1").arg(currentTemperature));
+    } else {
+        currentTemperature = -1.0;
+    }
+
+    ui->currentEdit->setText(QString("%1").arg(resistance, 10, 'g', 4, ' '));
+
+    if(!bRunning) return;
+
+    QString sData = QString("%1 %2 %3\n")
+                            .arg(elapsedTime, 12, 'g', 6, ' ')
+                            .arg(resistance, 12, 'g', 6, ' ')
+                            .arg(currentTemperature, 12, 'g', 6, ' ');
+    pOutputFile->write(sData.toLocal8Bit());
+    pOutputFile->flush();
+
     pPlotMeasurements->NewPoint(iPlotDark, elapsedTime, resistance);
     pPlotMeasurements->UpdatePlot();
 }
@@ -2033,11 +2081,20 @@ MainWindow::onVReverseSweepDone(QDateTime dataTime, QString sData) {
 
 
 bool
-MainWindow::getNewMeasure() {
+MainWindow::getNewK236Measure() {
     if(!isK236ReadyForTrigger)
         return false;
     isK236ReadyForTrigger = false;
     return pKeithley236->sendTrigger();
+}
+
+
+bool
+MainWindow::getNewHp3478Measure() {
+    if(!isHp3478ReadyForTrigger)
+        return false;
+    isHp3478ReadyForTrigger = false;
+    return pHp3478->sendTrigger();
 }
 
 

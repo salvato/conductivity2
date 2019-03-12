@@ -173,6 +173,7 @@ Hp3478::onGpibCallback(int LocalUd, unsigned long LocalIbsta, unsigned long Loca
         if(sResponse != QString()) {
             QDateTime currentTime = QDateTime::currentDateTime();
             emit newReading(currentTime, sResponse);
+            emit readyForTrigger();
         }
     }
     hp3478::rearmMask = RQS;

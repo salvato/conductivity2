@@ -24,6 +24,7 @@ QT_FORWARD_DECLARE_CLASS(MainWindow)
 QT_FORWARD_DECLARE_CLASS(QTabWidget)
 QT_FORWARD_DECLARE_CLASS(QDialogButtonBox)
 QT_FORWARD_DECLARE_CLASS(K236Tab)
+QT_FORWARD_DECLARE_CLASS(hp3478Tab)
 QT_FORWARD_DECLARE_CLASS(LS330Tab)
 QT_FORWARD_DECLARE_CLASS(CS130Tab)
 QT_FORWARD_DECLARE_CLASS(FileTab)
@@ -45,10 +46,11 @@ protected:
     void setToolTips();
 
 public:
-    K236Tab  *pTabK236;
-    LS330Tab *pTabLS330;
-    CS130Tab *pTabCS130;
-    FileTab  *pTabFile;
+    K236Tab   *pTabK236;
+    hp3478Tab *pTabHp3478;
+    LS330Tab  *pTabLS330;
+    CS130Tab  *pTabCS130;
+    FileTab   *pTabFile;
 
 private:
     MainWindow       *pParent;

@@ -30,7 +30,8 @@ TEMPLATE = app
 
 
 SOURCES += main.cpp \
-    Hp3478.cpp
+    Hp3478.cpp \
+    hp3478tab.cpp
 SOURCES += plotpropertiesdlg.cpp
 SOURCES += EasterDlg.cpp
 SOURCES += datastream2d.cpp
@@ -51,7 +52,8 @@ SOURCES += AxisFrame.cpp
 SOURCES += DataSetProperties.cpp
 
 HEADERS += mainwindow.h \
-    Hp3478.h
+    Hp3478.h \
+    hp3478tab.h
 HEADERS += plotpropertiesdlg.h
 HEADERS += EasterDlg.h
 HEADERS += datastream2d.h

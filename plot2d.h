@@ -90,7 +90,6 @@ protected:
     QPen gridPen;
     QPen framePen;
 
-    int maxDataPoints;
     bool bZooming;
     bool bShowMarker;
     double xMarker, yMarker;

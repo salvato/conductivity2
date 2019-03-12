@@ -53,7 +53,6 @@ Plot2D::Plot2D(QWidget *parent, QString Title)
     gridPen  = pPropertiesDlg->gridColor; //QPen(Qt::blue);
     framePen = pPropertiesDlg->frameColor;//QPen(Qt::blue);
     gridPen.setWidth(pPropertiesDlg->gridPenWidth);
-    maxDataPoints = pPropertiesDlg->maxDataPoints;
 
     sMouseCoord = QString("X=%1 Y=%2")
                   .arg(0.0, 10, 'g', 7, ' ')
@@ -126,9 +125,9 @@ Plot2D::sizeHint() const {
 
 void
 Plot2D::setMaxPoints(int nPoints) {
-    if(nPoints > 0) maxDataPoints = nPoints;
+    if(nPoints > 0) pPropertiesDlg->maxDataPoints = nPoints;
     for(int pos=0; pos<dataSetList.count(); pos++) {
-        dataSetList.at(pos)->setMaxPoints(maxDataPoints);
+        dataSetList.at(pos)->setMaxPoints(pPropertiesDlg->maxDataPoints);
     }
 }
 
@@ -236,7 +235,7 @@ Plot2D::SetLimits (double XMin, double XMax, double YMin, double YMax,
 DataStream2D*
 Plot2D::NewDataSet(int Id, int PenWidth, QColor Color, int Symbol, QString Title) {
     DataStream2D* pDataItem = new DataStream2D(Id, PenWidth, Color, Symbol, Title);
-    pDataItem->setMaxPoints(maxDataPoints);
+    pDataItem->setMaxPoints(pPropertiesDlg->maxDataPoints);
     dataSetList.append(pDataItem);
     return pDataItem;
 }
@@ -1001,7 +1000,6 @@ Plot2D::UpdatePlot() {
     gridPen  = pPropertiesDlg->gridColor;
     framePen = pPropertiesDlg->frameColor;
     gridPen.setWidth(pPropertiesDlg->gridPenWidth);
-    maxDataPoints = pPropertiesDlg->maxDataPoints;
     update();
 }
 
