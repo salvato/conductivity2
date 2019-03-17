@@ -482,7 +482,7 @@ MainWindow::updateUserInterface() {
         ui->voltageEdit->hide();
         ui->labelV->hide();
     }
-    if(!bUseHp3478) {
+    if((!bUseHp3478) && (!bUseKeithley236)) {
         ui->startRvsTimeButton->hide();
         ui->labelV->hide();
         ui->labelVoltage->hide();
