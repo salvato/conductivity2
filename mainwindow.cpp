@@ -670,8 +670,8 @@ MainWindow::on_startRvsTButton_clicked() {
     // All done... compute the time needed for the measurement:
     startMeasuringTime = QDateTime::currentDateTime();
     double deltaT, expectedMinutes;
-    deltaT = pConfigureDialog->pTabLS330->dTStop -
-             pConfigureDialog->pTabLS330->dTStart;
+    deltaT = fabs(pConfigureDialog->pTabLS330->dTStop -
+             pConfigureDialog->pTabLS330->dTStart);
     expectedMinutes = deltaT / pConfigureDialog->pTabLS330->dTRate +
                       pConfigureDialog->pTabLS330->iReachingTStart +
                       pConfigureDialog->pTabLS330->iTimeToSteadyT;
@@ -1036,8 +1036,8 @@ MainWindow::on_startIvsVButton_clicked() {
                                    .arg(pConfigureDialog->pTabLS330->dTStart));
         // Adjust the time needed for the measurement:
         double deltaT;
-        deltaT = pConfigureDialog->pTabLS330->dTStop -
-                 pConfigureDialog->pTabLS330->dTStart;
+        deltaT = fabs(pConfigureDialog->pTabLS330->dTStop -
+                 pConfigureDialog->pTabLS330->dTStart);
         expectedSeconds += 60.0 *(pConfigureDialog->pTabLS330->iReachingTStart +
                                   pConfigureDialog->pTabLS330->iTimeToSteadyT);
         expectedSeconds *= int(deltaT / pConfigureDialog->pTabLS330->dTStep);
@@ -1592,8 +1592,8 @@ MainWindow::onSteadyTReached() {
     stabilizingTimer.disconnect();
     // Update the time needed for the measurement:
     double deltaT, expectedMinutes;
-    deltaT = pConfigureDialog->pTabLS330->dTStop -
-             pConfigureDialog->pTabLS330->dTStart;
+    deltaT = fabs(pConfigureDialog->pTabLS330->dTStop -
+             pConfigureDialog->pTabLS330->dTStart);
     expectedMinutes = deltaT / pConfigureDialog->pTabLS330->dTRate;
     endMeasureTime = QDateTime::currentDateTime().addSecs(qint64(expectedMinutes*60.0));
     QString sString = endMeasureTime.toString("hh:mm dd-MM-yyyy");
@@ -1622,8 +1622,8 @@ MainWindow::onTimeToCheckReachedT() {
         if((presentMeasure==RvsTSourceI)||
            (presentMeasure==RvsTSourceV))
         {
-            deltaT = pConfigureDialog->pTabLS330->dTStop -
-                     pConfigureDialog->pTabLS330->dTStart;
+            deltaT = fabs(pConfigureDialog->pTabLS330->dTStop -
+                     pConfigureDialog->pTabLS330->dTStart);
             expectedMinutes += deltaT / pConfigureDialog->pTabLS330->dTRate;
         }
         endMeasureTime = startMeasuringTime.addSecs(qint64(expectedMinutes*60.0));
@@ -1675,8 +1675,8 @@ MainWindow::onTimerStabilizeT() {
     measuringTimer.start(int(timeBetweenMeasurements));
     // Update the time needed for the measurement:
     double deltaT, expectedMinutes;
-    deltaT = pConfigureDialog->pTabLS330->dTStop -
-             pConfigureDialog->pTabLS330->dTStart;
+    deltaT = fabs(pConfigureDialog->pTabLS330->dTStop -
+             pConfigureDialog->pTabLS330->dTStart);
     expectedMinutes = deltaT / pConfigureDialog->pTabLS330->dTRate;
     endMeasureTime = QDateTime::currentDateTime().addSecs(qint64(expectedMinutes*60.0));
     QString sString = endMeasureTime.toString("hh:mm dd-MM-yyyy");
