@@ -1509,7 +1509,7 @@ MainWindow::initSvsLPlots() {
     pPlotMeasurements->setMaxPoints(maxPlotPoints);
     pPlotMeasurements->NewDataSet(1,//Id
                                   3, //Pen Width
-                                  QColor(255, 255, 0),// Color
+                                  QColor(255, 128, 64),// Color
                                   Plot2D::ipoint,// Symbol
                                   "Grat 1"// Title
                                   );
@@ -1530,13 +1530,24 @@ MainWindow::initTemperaturePlot() {
     pPlotTemperature->setMaxPoints(maxPlotPoints);
     pPlotTemperature->NewDataSet(1,//Id
                                  3, //Pen Width
-                                 QColor(255, 255, 0),// Color
+                                 QColor(255, 128, 64),// Color
                                  Plot2D::ipoint,// Symbol
                                  "T"// Title
                                  );
     pPlotTemperature->SetShowDataSet(1, true);
     pPlotTemperature->SetShowTitle(1, true);
     pPlotTemperature->SetLimits(0.0, 1.0, 0.0, 1.0, true, true, false, false);
+
+    pPlotTemperature->NewDataSet(2,//Id
+                                 3, //Pen Width
+                                 QColor(255, 255, 0),// Color
+                                 Plot2D::ipoint,// Symbol
+                                 "Tm"// Title
+                                 );
+    pPlotTemperature->SetShowDataSet(2, true);
+    pPlotTemperature->SetShowTitle(2, true);
+    pPlotTemperature->SetLimits(0.0, 1.0, 0.0, 1.0, true, true, false, false);
+
     pPlotTemperature->UpdatePlot();
     pPlotTemperature->show();
 
