@@ -475,21 +475,19 @@ MainWindow::updateUserInterface() {
     if(!bUseKeithley236) {
         ui->startIvsVButton->hide();
         ui->labelCompliance->hide();
-        // In the hope that a Hp3478A is connected !
-        ui->labelA->setText(QString("Ω"));
-        ui->labelCurrent->setText(QString("Resistance"));
         ui->labelVoltage->hide();
         ui->voltageEdit->hide();
         ui->labelV->hide();
-    }
-    if((!bUseHp3478) && (!bUseKeithley236)) {
-        ui->startRvsTimeButton->hide();
-        ui->labelV->hide();
-        ui->labelVoltage->hide();
-        ui->voltageEdit->hide();
-        ui->labelCurrent->hide();
-        ui->currentEdit->hide();
-        ui->labelA->hide();
+        if(bUseHp3478) {
+            ui->labelA->setText(QString("Ω"));
+            ui->labelCurrent->setText(QString("Resistance"));
+        }
+        else {
+            ui->startRvsTimeButton->hide();
+            ui->labelCurrent->hide();
+            ui->currentEdit->hide();
+            ui->labelA->hide();
+        }
     }
     if(!bUseMonochromator) {
         ui->lambdaScanButton->hide();
