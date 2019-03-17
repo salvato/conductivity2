@@ -697,8 +697,8 @@ MainWindow::writeRvsTHeader() {
     // Write the header
     // To cope with the GnuPlot way to handle the comment lines
     // we need a # as a first chraracter in each row.
-    pOutputFile->write(QString("#%1 %2 %3 %4 %5 %6")
-                       .arg("T-Dark[K]", 12)
+    pOutputFile->write(QString("%1 %2 %3 %4 %5 %6")
+                       .arg("#T-Dark[K]", 12)
                        .arg("V-Dark[V]", 12)
                        .arg("I-Dark[A]", 12)
                        .arg("T-Photo[K]", 12)
@@ -1059,8 +1059,8 @@ MainWindow::on_startIvsVButton_clicked() {
 void
 MainWindow::writeIvsVHeader() {
     // To cope with GnuPlot way to handle the comment lines
-    pOutputFile->write(QString("#%1 %2 %3\n")
-                       .arg("Voltage[V]", 12)
+    pOutputFile->write(QString("%1 %2 %3\n")
+                       .arg("#Voltage[V]", 12)
                        .arg("Current[A]", 12)
                        .arg("Temp.[K]", 12).toLocal8Bit());
     QStringList HeaderLines = pConfigureDialog->pTabFile->sSampleInfo.split("\n");
@@ -1240,8 +1240,8 @@ MainWindow::writeLambdaScanHeader() {
     // Write the header
     // To cope with the GnuPlot way to handle the comment lines
     // we need a # as a first chraracter in each row.
-    pOutputFile->write(QString("#%1 %2 %3 %4 %5 %6 %7")
-                       .arg("Wavelen[nm]", 12)
+    pOutputFile->write(QString("%1 %2 %3 %4 %5 %6 %7")
+                       .arg("#Wavelen[nm]", 12)
                        .arg("T-Dark[K]", 12)
                        .arg("V-Dark[V]", 12)
                        .arg("I-Dark[A]", 12)
