@@ -78,7 +78,7 @@ ConfigureDialog::ConfigureDialog(int iConfiguration, MainWindow *parent)
         break;
     case MainWindow::iConfRvsTime:
         setWindowTitle("R versus Time");
-        if(pTabLS330) pTabLS330->setDisabled(true);
+//        if(pTabLS330) pTabLS330->setDisabled(true);
         if(pTabCS130) pTabCS130->setDisabled(true);
         break;
     case MainWindow::iConfLScan:
