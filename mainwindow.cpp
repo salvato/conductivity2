@@ -689,6 +689,7 @@ MainWindow::on_startRvsTButton_clicked() {
                                .arg(pConfigureDialog->pTabLS330->dTStart));
     // Start the reaching of the Initial Temperature
     waitingTStartTimer.start(5000);
+    dateStart = QDateTime::currentDateTime();
 }
 
 
@@ -786,7 +787,7 @@ MainWindow::on_startRvsTimeButton_clicked() {
     if(pConfigureDialog->exec() == QDialog::Rejected)
         return;
     QApplication::setOverrideCursor(QCursor(Qt::BusyCursor));
-    switchLampOff();
+//    switchLampOff();
 
     if(pKeithley236) {// Initializing Keithley 236
         ui->statusBar->showMessage("Initializing Keithley 236...");
@@ -875,12 +876,12 @@ MainWindow::on_startRvsTimeButton_clicked() {
 
     // Configure the needed timers
     if(pLakeShore330) {
-        connect(&readingTTimer, SIGNAL(timeout()),
-                this, SLOT(onTimeToReadT()));
-        // Read and plot initial value of Temperature
-        startReadingTTime = QDateTime::currentDateTime();
-        onTimeToReadT();
-        readingTTimer.start(30000);
+//        connect(&readingTTimer, SIGNAL(timeout()),
+//                this, SLOT(onTimeToReadT()));
+//        // Read and plot initial value of Temperature
+//        startReadingTTime = QDateTime::currentDateTime();
+//        onTimeToReadT();
+//        readingTTimer.start(30000);
         if(pConfigureDialog->pTabLS330->bUseThermostat) {
             pLakeShore330->setTemperature(pConfigureDialog->pTabLS330->dTStart);
             pLakeShore330->switchPowerOn(3);
@@ -971,10 +972,12 @@ MainWindow::on_startIvsVButton_clicked() {
         ui->wavelengthEdit->setText(QString("%1")
                                     .arg(pConfigureDialog->pTabCS130->dWavelength, 10, 'f', 1, ' '));
     }
-    if(pConfigureDialog->pTabCS130->bPhoto)
-        switchLampOn();
-    else
-        switchLampOff();
+    if(pConfigureDialog->pTabCS130) {
+        if(pConfigureDialog->pTabCS130->bPhoto)
+            switchLampOn();
+        else
+            switchLampOff();
+    }
     // Initializing Keithley 236
     ui->statusBar->showMessage("Initializing Keithley 236...");
     if(pKeithley236->init()) {
@@ -989,13 +992,15 @@ MainWindow::on_startIvsVButton_clicked() {
             this, SLOT(onClearComplianceEvent()));
     connect(pKeithley236, SIGNAL(readyForTrigger()),
             this, SLOT(onKeithleyReadyForSweepTrigger()));
-    // Initializing LakeShore 330
-    ui->statusBar->showMessage("Initializing LakeShore 330...");
-    if(pLakeShore330->init()) {
-        ui->statusBar->showMessage("Unable to Initialize LakeShore 330...");
-        pKeithley236->disconnect();
-        stopIvsV();
-        return;
+    if(pLakeShore330) {
+        // Initializing LakeShore 330
+        ui->statusBar->showMessage("Initializing LakeShore 330...");
+        if(pLakeShore330->init()) {
+            ui->statusBar->showMessage("Unable to Initialize LakeShore 330...");
+            pKeithley236->disconnect();
+            stopIvsV();
+            return;
+        }
     }
     // Open the Output file
     ui->statusBar->showMessage("Opening Output file...");
@@ -1021,26 +1026,28 @@ MainWindow::on_startIvsVButton_clicked() {
     startMeasuringTime = QDateTime::currentDateTime();
     expectedSeconds = 0.32+pConfigureDialog->pTabK236->iWaitTime/1000.0;
     expectedSeconds *= pConfigureDialog->pTabK236->iNSweepPoints;
-    if(pConfigureDialog->pTabLS330->bUseThermostat) {
-        connect(&waitingTStartTimer, SIGNAL(timeout()),
-                this, SLOT(onTimeToCheckT()));
-        waitingTStartTime = QDateTime::currentDateTime();
-        // Start the reaching of the Initial Temperature
-        // Configure Thermostat
-        setPointT = pConfigureDialog->pTabLS330->dTStart;
-        pLakeShore330->setTemperature(setPointT);
-        pLakeShore330->switchPowerOn(3);
-        waitingTStartTimer.start(5000);
-        ui->statusBar->showMessage(QString("%1 Waiting Initial T[%2K]")
-                                   .arg(waitingTStartTime.toString())
-                                   .arg(pConfigureDialog->pTabLS330->dTStart));
-        // Adjust the time needed for the measurement:
-        double deltaT;
-        deltaT = fabs(pConfigureDialog->pTabLS330->dTStop -
-                 pConfigureDialog->pTabLS330->dTStart);
-        expectedSeconds += 60.0 *(pConfigureDialog->pTabLS330->iReachingTStart +
-                                  pConfigureDialog->pTabLS330->iTimeToSteadyT);
-        expectedSeconds *= int(deltaT / pConfigureDialog->pTabLS330->dTStep);
+    if(pConfigureDialog->pTabLS330) {
+        if(pConfigureDialog->pTabLS330->bUseThermostat) {
+            connect(&waitingTStartTimer, SIGNAL(timeout()),
+                    this, SLOT(onTimeToCheckT()));
+            waitingTStartTime = QDateTime::currentDateTime();
+            // Start the reaching of the Initial Temperature
+            // Configure Thermostat
+            setPointT = pConfigureDialog->pTabLS330->dTStart;
+            pLakeShore330->setTemperature(setPointT);
+            pLakeShore330->switchPowerOn(3);
+            waitingTStartTimer.start(5000);
+            ui->statusBar->showMessage(QString("%1 Waiting Initial T[%2K]")
+                                       .arg(waitingTStartTime.toString())
+                                       .arg(pConfigureDialog->pTabLS330->dTStart));
+            // Adjust the time needed for the measurement:
+            double deltaT;
+            deltaT = fabs(pConfigureDialog->pTabLS330->dTStop -
+                     pConfigureDialog->pTabLS330->dTStart);
+            expectedSeconds += 60.0 *(pConfigureDialog->pTabLS330->iReachingTStart +
+                                      pConfigureDialog->pTabLS330->iTimeToSteadyT);
+            expectedSeconds *= int(deltaT / pConfigureDialog->pTabLS330->dTStep);
+        }
     }
     else {
         startI_Vscan(pConfigureDialog->pTabK236->bSourceI);
@@ -1081,25 +1088,29 @@ MainWindow::writeIvsVHeader() {
                            .arg(pConfigureDialog->pTabK236->dStop)
                            .arg(pConfigureDialog->pTabK236->dCompliance).toLocal8Bit());
     }
-    if(pConfigureDialog->pTabLS330->bUseThermostat) {
-        pOutputFile->write(QString("# T_Start=%1[K] T_Stop=%2[K] T_Step=%3[K]\n")
-                           .arg(pConfigureDialog->pTabLS330->dTStart)
-                           .arg(pConfigureDialog->pTabLS330->dTStop)
-                           .arg(pConfigureDialog->pTabLS330->dTStep).toLocal8Bit());
-        pOutputFile->write(QString("# Max_T_Start_Wait=%1[min] T_Stabilize_Time=%2[min]\n")
-                           .arg(pConfigureDialog->pTabLS330->iReachingTStart)
-                           .arg(pConfigureDialog->pTabLS330->iTimeToSteadyT).toLocal8Bit());
-    }
-    if(pConfigureDialog->pTabCS130->bPhoto) {
-        pOutputFile->write(QString("# Lamp=On\n").toLocal8Bit());
-        if(bUseMonochromator) {
-            pOutputFile->write(QString("# Grating #= %1 Wavelength = %2 nm\n")
-                                       .arg(pConfigureDialog->pTabCS130->iGratingNumber)
-                                       .arg(pConfigureDialog->pTabCS130->dWavelength).toLocal8Bit());
+    if(pConfigureDialog->pTabLS330) {
+        if(pConfigureDialog->pTabLS330->bUseThermostat) {
+            pOutputFile->write(QString("# T_Start=%1[K] T_Stop=%2[K] T_Step=%3[K]\n")
+                               .arg(pConfigureDialog->pTabLS330->dTStart)
+                               .arg(pConfigureDialog->pTabLS330->dTStop)
+                               .arg(pConfigureDialog->pTabLS330->dTStep).toLocal8Bit());
+            pOutputFile->write(QString("# Max_T_Start_Wait=%1[min] T_Stabilize_Time=%2[min]\n")
+                               .arg(pConfigureDialog->pTabLS330->iReachingTStart)
+                               .arg(pConfigureDialog->pTabLS330->iTimeToSteadyT).toLocal8Bit());
         }
     }
-    else {
-        pOutputFile->write(QString("# Lamp=Off\n").toLocal8Bit());
+    if(pConfigureDialog->pTabCS130) {
+        if(pConfigureDialog->pTabCS130->bPhoto) {
+            pOutputFile->write(QString("# Lamp=On\n").toLocal8Bit());
+            if(bUseMonochromator) {
+                pOutputFile->write(QString("# Grating #= %1 Wavelength = %2 nm\n")
+                                           .arg(pConfigureDialog->pTabCS130->iGratingNumber)
+                                           .arg(pConfigureDialog->pTabCS130->dWavelength).toLocal8Bit());
+            }
+        }
+        else {
+            pOutputFile->write(QString("# Lamp=Off\n").toLocal8Bit());
+        }
     }
     pOutputFile->flush();
 }
@@ -1487,8 +1498,10 @@ MainWindow::initIvsVPlots() {
     pPlotMeasurements->SetLimits(0.0, 1.0, 0.0, 1.0, true, true, false, false);
     pPlotMeasurements->UpdatePlot();
     pPlotMeasurements->show();
-    // Plot of Temperature vs Time
-    initTemperaturePlot();
+    if(pLakeShore330) {
+        // Plot of Temperature vs Time
+        initTemperaturePlot();
+    }
 }
 
 
@@ -1651,6 +1664,8 @@ MainWindow::onTimerStabilizeT() {
     // It's time to start measurements
     stabilizingTimer.stop();
     stabilizingTimer.disconnect();
+    readingTTimer.stop();
+    readingTTimer.disconnect();
     pPlotTemperature->NewDataSet(2,//Id
                                  3, //Pen Width
                                  QColor(255, 255, 0),// Color
@@ -1710,16 +1725,18 @@ MainWindow::onTimeToGetNewHp3478Measure() {
 
 void
 MainWindow::onTimeToReadT() {
-    currentTemperature = pLakeShore330->getTemperature();
-    currentTime = QDateTime::currentDateTime();
-    ui->temperatureEdit->setText(QString("%1").arg(currentTemperature));
-    pPlotTemperature->NewPoint(iCurrentTPlot,
-                               double(startReadingTTime.secsTo(currentTime)),
-                               currentTemperature);
-    pPlotTemperature->UpdatePlot();
-    if(stabilizingTimer.isActive()) {
-        ui->statusBar->showMessage(QString("Thermal Stabilization for %1 min.")
-                                   .arg(ceil(stabilizingTimer.remainingTime()/(60000.0))));
+    if(pLakeShore330) {
+        currentTemperature = pLakeShore330->getTemperature();
+        currentTime = QDateTime::currentDateTime();
+        ui->temperatureEdit->setText(QString("%1").arg(currentTemperature));
+        pPlotTemperature->NewPoint(iCurrentTPlot,
+                                   double(startReadingTTime.secsTo(currentTime)),
+                                   currentTemperature);
+        pPlotTemperature->UpdatePlot();
+        if(stabilizingTimer.isActive()) {
+            ui->statusBar->showMessage(QString("Thermal Stabilization for %1 min.")
+                                       .arg(ceil(stabilizingTimer.remainingTime()/(60000.0))));
+        }
     }
 }
 
@@ -1760,12 +1777,16 @@ MainWindow::onKeithleyReadyForSweepTrigger() {
 
 
 void
-MainWindow::onNewRvsTKeithleyReading(QDateTime dataTime, QString sDataRead) {
-    Q_UNUSED(dataTime)
+MainWindow::onNewRvsTKeithleyReading(QDateTime dateTime, QString sDataRead) {
+    double elapsedTime;
+    elapsedTime = double(dateStart.secsTo(dateTime));
     double current, voltage;
     if(!DecodeReadings(sDataRead, &current, &voltage))
         return;
     currentTemperature = pLakeShore330->getTemperature();
+    pPlotTemperature->NewPoint(2, elapsedTime, currentTemperature);
+    pPlotTemperature->UpdatePlot();
+
     ui->temperatureEdit->setText(QString("%1").arg(currentTemperature));
     ui->currentEdit->setText(QString("%1").arg(current, 10, 'g', 4, ' '));
     ui->voltageEdit->setText(QString("%1").arg(voltage, 10, 'g', 4, ' '));
@@ -1807,6 +1828,8 @@ MainWindow::onNewRvsTimeHp3478Reading(QDateTime dateTime, QString sDataRead) {
     elapsedTime = double(dateStart.secsTo(dateTime));
     if(bUseLakeShore330) {
         currentTemperature = pLakeShore330->getTemperature();
+        pPlotTemperature->NewPoint(2, elapsedTime, currentTemperature);
+        pPlotTemperature->UpdatePlot();
         ui->temperatureEdit->setText(QString("%1").arg(currentTemperature));
     } else {
         currentTemperature = -1.0;
@@ -1834,8 +1857,12 @@ MainWindow::onNewRvsTimeKeithleyReading(QDateTime dateTime, QString sDataRead) {
     if(!DecodeReadings(sDataRead, &current, &voltage))
         return;
     elapsedTime = double(dateStart.secsTo(dateTime));
-    currentTemperature = pLakeShore330->getTemperature();
-    ui->temperatureEdit->setText(QString("%1").arg(currentTemperature));
+    if(pLakeShore330) {
+        currentTemperature = pLakeShore330->getTemperature();
+        pPlotTemperature->NewPoint(2, elapsedTime, currentTemperature);
+        pPlotTemperature->UpdatePlot();
+        ui->temperatureEdit->setText(QString("%1").arg(currentTemperature));
+    }
     ui->currentEdit->setText(QString("%1").arg(current, 10, 'g', 4, ' '));
     ui->voltageEdit->setText(QString("%1").arg(voltage, 10, 'g', 4, ' '));
     if(bUseMonochromator) {
@@ -1866,7 +1893,9 @@ MainWindow::DecodeReadings(QString sDataRead, double *current, double *voltage) 
         logMessage("Measurement Format Error");
         return false;
     }
-    currentTemperature = pLakeShore330->getTemperature();
+    if(pLakeShore330) {
+        currentTemperature = pLakeShore330->getTemperature();
+    }
     if(pConfigureDialog->pTabK236->bSourceI) {
         *current = sMeasures.at(0).toDouble();
         *voltage = sMeasures.at(1).toDouble();
@@ -1957,32 +1986,34 @@ MainWindow::onKeithleySweepDone(QDateTime dataTime, QString sData) {
     }
     pPlotMeasurements->UpdatePlot();
     pOutputFile->flush();
-    if(pConfigureDialog->pTabLS330->bUseThermostat) {
-        setPointT += pConfigureDialog->pTabLS330->dTStep;
-        if(setPointT > pConfigureDialog->pTabLS330->dTStop) {
-            stopIvsV();
-            ui->statusBar->showMessage("Measure Done");
-            onClearComplianceEvent();
-            return;
+    if(pConfigureDialog->pTabLS330) {
+        if(pConfigureDialog->pTabLS330->bUseThermostat) {
+            setPointT += pConfigureDialog->pTabLS330->dTStep;
+            if(setPointT > pConfigureDialog->pTabLS330->dTStop) {
+                stopIvsV();
+                ui->statusBar->showMessage("Measure Done");
+                onClearComplianceEvent();
+                return;
+            }
+            isK236ReadyForTrigger = false;
+            connect(pKeithley236, SIGNAL(complianceEvent()),
+                    this, SLOT(onComplianceEvent()));
+            connect(pKeithley236, SIGNAL(clearCompliance()),
+                    this, SLOT(onClearComplianceEvent()));
+            connect(pKeithley236, SIGNAL(readyForTrigger()),
+                    this, SLOT(onKeithleyReadyForSweepTrigger()));
+            connect(&waitingTStartTimer, SIGNAL(timeout()),
+                    this, SLOT(onTimeToCheckT()));
+            waitingTStartTime = QDateTime::currentDateTime();
+            // Start the reaching of the Next Temperature
+            waitingTStartTimer.start(5000);
+            // Configure Thermostat
+            pLakeShore330->setTemperature(setPointT);
+            pLakeShore330->switchPowerOn(3);
+            ui->statusBar->showMessage(QString("%1 Waiting Next T [%2K]")
+                                       .arg(waitingTStartTime.toString())
+                                       .arg(setPointT));
         }
-        isK236ReadyForTrigger = false;
-        connect(pKeithley236, SIGNAL(complianceEvent()),
-                this, SLOT(onComplianceEvent()));
-        connect(pKeithley236, SIGNAL(clearCompliance()),
-                this, SLOT(onClearComplianceEvent()));
-        connect(pKeithley236, SIGNAL(readyForTrigger()),
-                this, SLOT(onKeithleyReadyForSweepTrigger()));
-        connect(&waitingTStartTimer, SIGNAL(timeout()),
-                this, SLOT(onTimeToCheckT()));
-        waitingTStartTime = QDateTime::currentDateTime();
-        // Start the reaching of the Next Temperature
-        waitingTStartTimer.start(5000);
-        // Configure Thermostat
-        pLakeShore330->setTemperature(setPointT);
-        pLakeShore330->switchPowerOn(3);
-        ui->statusBar->showMessage(QString("%1 Waiting Next T [%2K]")
-                                   .arg(waitingTStartTime.toString())
-                                   .arg(setPointT));
     }
     else {
         stopIvsV();
