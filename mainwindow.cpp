@@ -1012,7 +1012,7 @@ MainWindow::on_startIvsVButton_clicked() {
     }
     // Write IvsV  File Header
     writeIvsVHeader();
-    // Initi the Plots
+    // Init the Plots
     initIvsVPlots();
     isK236ReadyForTrigger = false;
     presentMeasure = IvsV;
@@ -2151,6 +2151,7 @@ void
 MainWindow::onLogMessage(QString sMessage) {
     logMessage(sMessage);
 }
+
 
 void
 MainWindow::on_logoButton_clicked() {
