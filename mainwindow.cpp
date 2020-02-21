@@ -51,6 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <QDebug>
 
 //#define MY_DEBUG
+#define MAXTIMINGS 85
+
 
 MainWindow::MainWindow(int iBoard, QWidget *parent)
     : QMainWindow(parent)
@@ -63,9 +65,10 @@ MainWindow::MainWindow(int iBoard, QWidget *parent)
     , pHp3478(Q_NULLPTR)
     , pPlotMeasurements(Q_NULLPTR)
     , pPlotTemperature(Q_NULLPTR)
+    , pPlotRH(Q_NULLPTR)
     , pConfigureDialog(Q_NULLPTR)
-    // BCM 23: pin 16 in the 40 pins GPIO connector
-    , gpioLEDpin(23)
+    , gpioLEDpin(23) // BCM 23: pin 16 in the 40 pins GPIO connector
+    , gpioDHT22pin(26) // BCM 26: pin 37 in the 40 pins GPIO connector
     // GPIO Numbers are Broadcom (BCM) numbers
     // For Raspberry Pi GPIO pin numbering see
     // https://pinout.xyz/
@@ -84,6 +87,7 @@ MainWindow::MainWindow(int iBoard, QWidget *parent)
     isHp3478ReadyForTrigger = false;
     maxPlotPoints           = 3000;
     wlResolution            = 5;// Wavelength steps. To be changed
+    iDHT22_Humidity         = 0;
 
     // Prepare message logging
     sLogFileName = QString("gpibLog.txt");
@@ -137,14 +141,7 @@ MainWindow::closeEvent(QCloseEvent *event) {
     settings.setValue("mainWindowGeometry", saveGeometry());
     settings.setValue("mainWindowState", saveState());
     if(bRunning) {
-        waitingTStartTimer.stop();
-        stabilizingTimer.stop();
-        readingTTimer.stop();
-        measuringTimer.stop();
-        waitingTStartTimer.disconnect();
-        stabilizingTimer.disconnect();
-        readingTTimer.disconnect();
-        measuringTimer.disconnect();
+        stopTimers();
         if(pOutputFile) {
             if(pOutputFile->isOpen())
                 pOutputFile->close();
@@ -193,10 +190,12 @@ MainWindow::stopTimers() {
     stabilizingTimer.stop();
     readingTTimer.stop();
     measuringTimer.stop();
+    readingDHT22Timer.stop();
     waitingTStartTimer.disconnect();
     stabilizingTimer.disconnect();
     readingTTimer.disconnect();
     measuringTimer.disconnect();
+    readingDHT22Timer.disconnect();
 }
 
 
@@ -463,6 +462,9 @@ MainWindow::checkInstruments() {
     }
 #endif
     bUseGpio = gpioHostHandle >= 0;
+    bDHT22Present = false;
+    if(bUseGpio)
+        bDHT22Present = read_dht22(&iDHT22_Humidity, &iDHT22_Temperature) != 0;
 
     switchLampOff();
     ui->statusBar->showMessage("GPIB Instruments Found! Ready to Start");
@@ -662,6 +664,11 @@ MainWindow::on_startRvsTButton_clicked() {
             this, SLOT(onTimeToCheckReachedT()));
     connect(&readingTTimer, SIGNAL(timeout()),
             this, SLOT(onTimeToReadT()));
+    if(bDHT22Present) {
+        connect(&readingDHT22Timer, SIGNAL(timeout()),
+                this, SLOT(onTimeToReadHumidity()));
+        readingDHT22Timer.start(1000);
+    }
     waitingTStartTime = QDateTime::currentDateTime();
     // Read and plot initial value of Temperature
     startReadingTTime = waitingTStartTime;
@@ -698,13 +705,14 @@ MainWindow::writeRvsTHeader() {
     // Write the header
     // To cope with the GnuPlot way to handle the comment lines
     // we need a # as a first chraracter in each row.
-    pOutputFile->write(QString("%1 %2 %3 %4 %5 %6")
+    pOutputFile->write(QString("%1 %2 %3 %4 %5 %6 %7")
                        .arg("#T-Dark[K]", 12)
                        .arg("V-Dark[V]", 12)
                        .arg("I-Dark[A]", 12)
                        .arg("T-Photo[K]", 12)
                        .arg("V-Photo[V]", 12)
                        .arg("I-Photo[A]\n", 12)
+                       .arg("RH[%]\n", 12)
                        .toLocal8Bit());
     QStringList HeaderLines = pConfigureDialog->pTabFile->sSampleInfo.split("\n");
     for(int i=0; i<HeaderLines.count(); i++) {
@@ -875,6 +883,11 @@ MainWindow::on_startRvsTimeButton_clicked() {
     }
 
     // Configure the needed timers
+    if(bDHT22Present) {
+        connect(&readingDHT22Timer, SIGNAL(timeout()),
+                this, SLOT(onTimeToReadHumidity()));
+        readingDHT22Timer.start(1000);
+    }
     if(pLakeShore330) {
 //        connect(&readingTTimer, SIGNAL(timeout()),
 //                this, SLOT(onTimeToReadT()));
@@ -911,11 +924,12 @@ MainWindow::writeRvsTimeHeader() {
     // To cope with the GnuPlot way to handle the comment lines
     // we need a # as a first chraracter in each row.
     if(bUseKeithley236) {
-        pOutputFile->write(QString("%1 %2 %3 %4\n")
+        pOutputFile->write(QString("%1 %2 %3 %4 %5\n")
                            .arg("#Time[s]", 12)
                            .arg("V[V]", 12)
                            .arg("I[A]", 12)
                            .arg("T[K]", 12)
+                           .arg("RH[%]", 12)
                            .toLocal8Bit());
         if(pConfigureDialog->pTabK236->bSourceI) {
             pOutputFile->write(QString("# Current=%1[A] Compliance=%2[V]\n")
@@ -929,10 +943,11 @@ MainWindow::writeRvsTimeHeader() {
         }
     }
     else if(bUseHp3478) {
-        pOutputFile->write(QString("%1 %2 %3\n")
+        pOutputFile->write(QString("%1 %2 %3 %4\n")
                            .arg("#Time[s]", 12)
                            .arg("R[Ohm]", 12)
                            .arg("T[K]", 12)
+                           .arg("RH[%]", 12)
                            .toLocal8Bit());
     }
 
@@ -1022,6 +1037,11 @@ MainWindow::on_startIvsVButton_clicked() {
     // Read and plot initial value of Temperature
     startReadingTTime = QDateTime::currentDateTime();
     onTimeToReadT();
+    if(bDHT22Present) {
+        connect(&readingDHT22Timer, SIGNAL(timeout()),
+                this, SLOT(onTimeToReadHumidity()));
+        readingDHT22Timer.start(1000);
+    }
     double expectedSeconds;
     startMeasuringTime = QDateTime::currentDateTime();
     expectedSeconds = 0.32+pConfigureDialog->pTabK236->iWaitTime/1000.0;
@@ -1066,10 +1086,12 @@ MainWindow::on_startIvsVButton_clicked() {
 void
 MainWindow::writeIvsVHeader() {
     // To cope with GnuPlot way to handle the comment lines
-    pOutputFile->write(QString("%1 %2 %3\n")
+    pOutputFile->write(QString("%1 %2 %3 %4\n")
                        .arg("#Voltage[V]", 12)
                        .arg("Current[A]", 12)
-                       .arg("Temp.[K]", 12).toLocal8Bit());
+                       .arg("Temp.[K]", 12)
+                       .arg("RH[%]\n", 12)
+                       .toLocal8Bit());
     QStringList HeaderLines = pConfigureDialog->pTabFile->sSampleInfo.split("\n");
     for(int i=0; i<HeaderLines.count(); i++) {
         pOutputFile->write("# ");
@@ -1203,6 +1225,11 @@ MainWindow::on_lambdaScanButton_clicked() {
     }
     connect(&readingTTimer, SIGNAL(timeout()),
             this, SLOT(onTimeToReadT()));
+    if(bDHT22Present) {
+        connect(&readingDHT22Timer, SIGNAL(timeout()),
+                this, SLOT(onTimeToReadHumidity()));
+        readingDHT22Timer.start(1000);
+    }
     waitingTStartTime = QDateTime::currentDateTime();
     // Read and plot initial value of Temperature
     startReadingTTime = waitingTStartTime;
@@ -1251,7 +1278,7 @@ MainWindow::writeLambdaScanHeader() {
     // Write the header
     // To cope with the GnuPlot way to handle the comment lines
     // we need a # as a first chraracter in each row.
-    pOutputFile->write(QString("%1 %2 %3 %4 %5 %6 %7")
+    pOutputFile->write(QString("%1 %2 %3 %4 %5 %6 %7 %8")
                        .arg("#Wavelen[nm]", 12)
                        .arg("T-Dark[K]", 12)
                        .arg("V-Dark[V]", 12)
@@ -1259,6 +1286,7 @@ MainWindow::writeLambdaScanHeader() {
                        .arg("T-Photo[K]", 12)
                        .arg("V-Photo[V]", 12)
                        .arg("I-Photo[A]\n", 12)
+                       .arg("RH[%]\n", 12)
                        .toLocal8Bit());
     QStringList HeaderLines = pConfigureDialog->pTabFile->sSampleInfo.split("\n");
     for(int i=0; i<HeaderLines.count(); i++) {
@@ -1442,6 +1470,9 @@ MainWindow::initRvsTPlots() {
     pPlotMeasurements->show();
 
     initTemperaturePlot();
+    if(bDHT22Present) {
+        initRHvsTimePlot();
+    }
 }
 
 
@@ -1473,6 +1504,33 @@ MainWindow::initRvsTimePlots() {
     if(bUseLakeShore330) {
         initTemperaturePlot();
     }
+    if(bDHT22Present) {
+        initRHvsTimePlot();
+    }
+}
+
+
+void
+MainWindow::initRHvsTimePlot() {
+    if(pPlotRH) delete pPlotRH;
+    pPlotRH = Q_NULLPTR;
+
+    // Plot of RH vs Time
+    pPlotRH = new Plot2D(this, QString("Relative Humidity [%] -vs- Time [s]"));
+    pPlotRH->setWindowTitle(QString("Relative Humidity [%]"));
+    pPlotRH->setMaxPoints(maxPlotPoints);
+    pPlotRH->SetLimits(0.0, 1.0, 0.0, 100.0, true, false, false, false);
+    // Dataset
+    pPlotRH->NewDataSet(1,                   //Id
+                        3,                   //Pen Width
+                        QColor(255, 255, 64),// Color
+                        Plot2D::ipoint,      // Symbol
+                        "RH%(t)"             // Title
+                       );
+    pPlotRH->SetShowDataSet(1, true);
+    pPlotRH->SetShowTitle(1, true);
+    pPlotRH->UpdatePlot();
+    pPlotRH->show();
 }
 
 
@@ -1501,6 +1559,9 @@ MainWindow::initIvsVPlots() {
     if(pLakeShore330) {
         // Plot of Temperature vs Time
         initTemperaturePlot();
+    }
+    if(bDHT22Present) {
+        initRHvsTimePlot();
     }
 }
 
@@ -1531,6 +1592,9 @@ MainWindow::initSvsLPlots() {
     pPlotMeasurements->show();
 
     initTemperaturePlot();
+    if(bDHT22Present) {
+        initRHvsTimePlot();
+    }
 }
 
 
@@ -1800,7 +1864,8 @@ MainWindow::onNewRvsTKeithleyReading(QDateTime dateTime, QString sDataRead) {
     QString sData = QString("%1 %2 %3")
                             .arg(currentTemperature, 12, 'g', 6, ' ')
                             .arg(voltage, 12, 'g', 6, ' ')
-                            .arg(current, 12, 'g', 6, ' ');
+                            .arg(current, 12, 'g', 6, ' ')
+                            .arg(iDHT22_Humidity, 12, 'i', 6, ' ');
     pOutputFile->write(sData.toLocal8Bit());
     if(currentLampStatus == LAMP_OFF) {
         if(voltage != 0.0) {
@@ -1842,7 +1907,8 @@ MainWindow::onNewRvsTimeHp3478Reading(QDateTime dateTime, QString sDataRead) {
     QString sData = QString("%1 %2 %3\n")
                             .arg(elapsedTime, 12, 'g', 6, ' ')
                             .arg(resistance, 12, 'g', 6, ' ')
-                            .arg(currentTemperature, 12, 'g', 6, ' ');
+                            .arg(currentTemperature, 12, 'g', 6, ' ')
+                            .arg(iDHT22_Humidity, 12, 'i', 6, ' ');
     pOutputFile->write(sData.toLocal8Bit());
     pOutputFile->flush();
 
@@ -1876,7 +1942,8 @@ MainWindow::onNewRvsTimeKeithleyReading(QDateTime dateTime, QString sDataRead) {
                             .arg(elapsedTime, 12, 'g', 6, ' ')
                             .arg(voltage, 12, 'g', 6, ' ')
                             .arg(current, 12, 'g', 6, ' ')
-                            .arg(currentTemperature, 12, 'g', 6, ' ');
+                            .arg(currentTemperature, 12, 'g', 6, ' ')
+                            .arg(iDHT22_Humidity, 12, 'i', 6, ' ');
     pOutputFile->write(sData.toLocal8Bit());
     pOutputFile->flush();
     if(current != 0.0) {
@@ -1923,11 +1990,12 @@ MainWindow::onNewLambdaScanKeithleyReading(QDateTime dataTime, QString sDataRead
     if(!bRunning) return;
 
     if(currentLampStatus == LAMP_OFF) {
-        QString sData = QString("%1 %2 %3 %4")
+        QString sData = QString("%1 %2 %3 %4 %5")
                                 .arg(lambda,  12, 'g', 6, ' ')
                                 .arg(currentTemperature, 12, 'g', 6, ' ')
                                 .arg(voltage, 12, 'g', 6, ' ')
-                                .arg(current, 12, 'g', 6, ' ');
+                                .arg(current, 12, 'g', 6, ' ')
+                                .arg(iDHT22_Humidity, 12, 'i', 6, ' ');
         pOutputFile->write(sData.toLocal8Bit());
         if(voltage != 0.0) {
             sigmaDark = current/voltage;
@@ -1942,10 +2010,11 @@ MainWindow::onNewLambdaScanKeithleyReading(QDateTime dataTime, QString sDataRead
             pPlotMeasurements->NewPoint(1, lambda, sigmaIll-sigmaDark);
             pPlotMeasurements->UpdatePlot();
         }
-        QString sData = QString("%1 %2 %3\n")
+        QString sData = QString("%1 %2 %3 %4\n")
                                 .arg(currentTemperature, 12, 'g', 6, ' ')
                                 .arg(voltage, 12, 'g', 6, ' ')
-                                .arg(current, 12, 'g', 6, ' ');
+                                .arg(current, 12, 'g', 6, ' ')
+                                .arg(iDHT22_Humidity, 12, 'i', 6, ' ');
         pOutputFile->write(sData.toLocal8Bit());
         pOutputFile->flush();
         switchLampOff();
@@ -1977,10 +2046,11 @@ MainWindow::onKeithleySweepDone(QDateTime dataTime, QString sData) {
             voltage = sMeasures.at(i).toDouble();
             current = sMeasures.at(i+1).toDouble();
         }
-        QString sData = QString("%1 %2 %3\n")
+        QString sData = QString("%1 %2 %3 %4\n")
                 .arg(voltage, 12, 'g', 6, ' ')
                 .arg(current, 12, 'g', 6, ' ')
-                .arg(currentTemperature, 12, 'g', 6, ' ');
+                .arg(currentTemperature, 12, 'g', 6, ' ')
+                .arg(iDHT22_Humidity, 12, 'i', 6, ' ');
         pOutputFile->write(sData.toLocal8Bit());
         pPlotMeasurements->NewPoint(1, voltage, current);
     }
@@ -2043,10 +2113,11 @@ MainWindow::onIForwardSweepDone(QDateTime dataTime, QString sData) {
             voltage = sMeasures.at(i).toDouble();
             current = sMeasures.at(i+1).toDouble();
         }
-        pOutputFile->write(QString("%1 %2 %3\n")
+        pOutputFile->write(QString("%1 %2 %3 %4\n")
                            .arg(voltage, 12, 'g', 6, ' ')
                            .arg(current, 12, 'g', 6, ' ')
                            .arg(setPointT, 12, 'g', 6, ' ')
+                           .arg(iDHT22_Humidity, 12, 'i', 6, ' ')
                            .toLocal8Bit());
         pPlotMeasurements->NewPoint(1, voltage, current);
     }
@@ -2096,10 +2167,11 @@ MainWindow::onVReverseSweepDone(QDateTime dataTime, QString sData) {
             voltage = sMeasures.at(i).toDouble();
             current = sMeasures.at(i+1).toDouble();
         }
-        pOutputFile->write(QString("%1 %2 %3\n")
+        pOutputFile->write(QString("%1 %2 %3 %4\n")
                            .arg(voltage, 12, 'g', 6, ' ')
                            .arg(current, 12, 'g', 6, ' ')
                            .arg(setPointT, 12, 'g', 6, ' ')
+                           .arg(iDHT22_Humidity, 12, 'i', 6, ' ')
                            .toLocal8Bit());
         pPlotMeasurements->NewPoint(1, voltage, current);
     }
@@ -2159,3 +2231,79 @@ MainWindow::on_logoButton_clicked() {
     easterDialog.exec();
 }
 
+void
+MainWindow::onTimeToReadHumidity() {
+    read_dht22(&iDHT22_Humidity, &iDHT22_Temperature);
+    if(pPlotRH) {
+        currentTime = QDateTime::currentDateTime();
+        pPlotRH->NewPoint(1,
+                          double(startReadingTTime.secsTo(currentTime)),
+                          double(iDHT22_Humidity));
+        pPlotRH->UpdatePlot();
+    }
+}
+
+
+int
+MainWindow::read_dht22(int* piHumidity, int* piTemp) {
+    uint8_t laststate;
+    uint8_t counter;
+    uint8_t j;
+    memset(dht22_dat, 0, sizeof(dht22_dat));
+
+    // pull pin down for 18 milliseconds
+    if(set_mode(gpioHostHandle, gpioDHT22pin, PI_OUTPUT) < 0)
+        qDebug() << "Error";
+    if(gpio_write(gpioHostHandle, gpioDHT22pin, 0) < 0)
+        qDebug() << "Error";
+    QThread::msleep(18);
+
+    // then pull it up for 40 microseconds
+    if(gpio_write(gpioHostHandle, gpioDHT22pin, 1) == PI_BAD_GPIO)
+        qDebug() << "Error";
+    QThread::usleep(40);
+
+    // prepare to read the pin
+    if(set_mode(gpioHostHandle, gpioDHT22pin, PI_INPUT) != 0)
+        qDebug() << "Error";
+
+    // detect change and read data
+    j = 0;
+    laststate = 1;
+    for(uint8_t i=0; i<MAXTIMINGS; i++) {
+        counter = 0;
+        while(gpio_read(gpioHostHandle, gpioDHT22pin) == laststate) {
+            counter++;
+            QThread::usleep(1);
+            if(counter == 255) {
+                break;
+            }
+        }
+        laststate = gpio_read(gpioHostHandle, gpioDHT22pin);
+
+        if(counter == 255) break;
+
+        // ignore first 3 transitions
+        if((i >= 4) && (i%2 == 0)) {
+            // shove each bit into the storage bytes
+            dht22_dat[j/8] <<= 1;
+            if(counter > 16)
+                dht22_dat[j/8] |= 1;
+            j++;
+        }
+    }
+
+    // check we read 40 bits (8bit x 5 ) + verify checksum in the last byte
+    // print it out if data is good
+    bool bChecksum = dht22_dat[4] == ((dht22_dat[0] + dht22_dat[1] + dht22_dat[2] + dht22_dat[3]) & 0xFF);
+    if((j >= 40) && bChecksum) {
+        *piHumidity = dht22_dat[0] * 256 + dht22_dat[1];
+        *piTemp = (dht22_dat[2] & 0x7F)* 256 + dht22_dat[3];
+        if((dht22_dat[2] & 0x80) != 0)
+            *piTemp *= -1;
+        return 1;
+    }
+    else {
+        return 0;
+    }
+}

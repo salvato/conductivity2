@@ -61,6 +61,7 @@ public:
     bool             bUseLakeShore330;
     bool             bUseHp3478;
     bool             bUseGpio;
+    bool             bDHT22Present;
 
 signals:
 
@@ -90,6 +91,8 @@ protected:
     bool prepareLogFile();
     void logMessage(QString sMessage);
     bool DecodeReadings(QString sDataRead, double *current, double *voltage);
+    void initRHvsTimePlot();
+    int  read_dht22(int* piHumidity, int* piTemp) ;
 
 private slots:
     void on_startRvsTButton_clicked();
@@ -100,6 +103,7 @@ private slots:
     void onTimerStabilizeT();
     void onSteadyTReached();
     void onTimeToReadT();
+    void onTimeToReadHumidity();
     void onTimeToGetNewK236Measure();
     void onComplianceEvent();
     void onClearComplianceEvent();
@@ -145,6 +149,7 @@ private:
     Hp3478          *pHp3478;
     Plot2D          *pPlotMeasurements;
     Plot2D          *pPlotTemperature;
+    Plot2D          *pPlotRH;
     ConfigureDialog *pConfigureDialog;
 
     QString          sNormalStyle;
@@ -163,6 +168,7 @@ private:
     QTimer           stabilizingTimer;
     QTimer           readingTTimer;
     QTimer           measuringTimer;
+    QTimer           readingDHT22Timer;
 
     const quint8     LAMP_ON    = 1;
     const quint8     LAMP_OFF   = 0;
@@ -183,9 +189,13 @@ private:
     int              junctionDirection;
     int              gpioHostHandle;
     int              gpioLEDpin;
+    int              gpioDHT22pin;
     double           sigmaDark;
     double           sigmaIll;
     double           wlResolution;
+    int              dht22_dat[5];
+    int              iDHT22_Humidity;
+    int              iDHT22_Temperature;
 
     QString          sLogFileName;
     QString          sLogDir;
