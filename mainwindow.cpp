@@ -2246,15 +2246,12 @@ MainWindow::onTimeToReadHumidity() {
 
 int
 MainWindow::read_dht22(int* piHumidity, int* piTemp) {
-    uint8_t laststate;
-    uint8_t counter;
-    uint8_t j;
     memset(dht22_dat, 0, sizeof(dht22_dat));
 
     // pull pin down for 18 milliseconds
-    if(set_mode(gpioHostHandle, gpioDHT22pin, PI_OUTPUT) < 0)
+    if(set_mode(gpioHostHandle, gpioDHT22pin, PI_OUTPUT) != 0)
         qDebug() << "Error";
-    if(gpio_write(gpioHostHandle, gpioDHT22pin, 0) < 0)
+    if(gpio_write(gpioHostHandle, gpioDHT22pin, 0) == PI_BAD_GPIO)
         qDebug() << "Error";
     QThread::msleep(18);
 
@@ -2268,8 +2265,9 @@ MainWindow::read_dht22(int* piHumidity, int* piTemp) {
         qDebug() << "Error";
 
     // detect change and read data
-    j = 0;
-    laststate = 1;
+    uint8_t j = 0;
+    uint8_t laststate = 1;
+    uint8_t counter;
     for(uint8_t i=0; i<MAXTIMINGS; i++) {
         counter = 0;
         while(gpio_read(gpioHostHandle, gpioDHT22pin) == laststate) {
