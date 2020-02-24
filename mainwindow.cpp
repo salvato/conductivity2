@@ -1582,7 +1582,7 @@ MainWindow::initRHvsTimePlot() {
     pPlotRH = Q_NULLPTR;
 
     // Plot of RH vs Time
-    pPlotRH = new Plot2D(this, QString("Relative Humidity [%] -vs- Time [s]"));
+    pPlotRH = new Plot2D(this, QString("RH [%] -vs- Time [s]"));
     pPlotRH->setWindowTitle(QString("Relative Humidity [%]"));
     pPlotRH->setMaxPoints(maxPlotPoints);
     pPlotRH->SetLimits(0.0, 1.0, 0.0, 100.0, true, false, false, false);
