@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <QTimer>
 
 #include "configuredialog.h"
+#include "pigpiod_if2.h" // The header for using GPIO pins on Raspberry
 
 
 
@@ -37,6 +38,15 @@ QT_FORWARD_DECLARE_CLASS(LakeShore330)
 QT_FORWARD_DECLARE_CLASS(CornerStone130)
 QT_FORWARD_DECLARE_CLASS(Hp3478)
 QT_FORWARD_DECLARE_CLASS(Plot2D)
+
+
+typedef struct {
+    int transitionCounter;
+    int iHumidity;
+    int iTemperature;
+    int callBackId;
+    void* pMainWindow = Q_NULLPTR;
+} callbackData;
 
 
 class MainWindow : public QMainWindow
@@ -64,6 +74,7 @@ public:
     bool             bDHT22Present;
 
 signals:
+    void dhtMeasureDone();
 
 protected:
     void closeEvent(QCloseEvent *event) Q_DECL_OVERRIDE;
@@ -92,7 +103,7 @@ protected:
     void logMessage(QString sMessage);
     bool DecodeReadings(QString sDataRead, double *current, double *voltage);
     void initRHvsTimePlot();
-    int  read_dht22(int* piHumidity, int* piTemp) ;
+    bool read_dht22();
 
 private slots:
     void on_startRvsTButton_clicked();
@@ -122,6 +133,7 @@ private slots:
     void onLogMessage(QString sMessage);
     void on_lambdaScanButton_clicked();
     void on_logoButton_clicked();
+    void onNewRHdata();
 
 
 private:
@@ -193,11 +205,24 @@ private:
     double           sigmaDark;
     double           sigmaIll;
     double           wlResolution;
-    int              dht22_dat[5];
-    int              iDHT22_Humidity;
-    int              iDHT22_Temperature;
+    callbackData     userData;
 
     QString          sLogFileName;
     QString          sLogDir;
 };
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+CBFuncEx_t dht22Callback(int handle,
+                         unsigned user_gpio,
+                         unsigned level,
+                         uint32_t currentTick,
+                         void *userdata);
+
+#ifdef __cplusplus
+}
+#endif
 

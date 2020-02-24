@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <QMessageBox>
 #include <QSharedMemory>
 #include <QFileInfo>
+#include <QThread>
 
 //#define TEST_NO_INTERFACE
 
@@ -105,6 +106,7 @@ main(int argc, char *argv[]) {
 
     MainWindow w(gpibBoardID);
     w.setWindowIcon(QIcon("qrc:/myLogoT.png"));
+    w.thread()->setPriority(QThread::TimeCriticalPriority);
     w.show();
     QApplication::setOverrideCursor(QCursor(Qt::BusyCursor));
 

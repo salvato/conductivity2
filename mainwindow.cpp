@@ -51,7 +51,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <QDebug>
 
 //#define MY_DEBUG
-#define MAXTIMINGS 85
+#define MAXTIMINGS 83
+
+
+uint32_t tick0;
+uint8_t ticks[MAXTIMINGS];
+uint8_t levels[MAXTIMINGS];
+uint8_t dht22_dat[5];
+
+
+CBFuncEx_t dht22Callback(int handle,
+                         unsigned user_gpio,
+                         unsigned level,
+                         uint32_t currentTick,
+                         void *userdata)
+{
+    // _tick is the number of microseconds since boot
+    //       WARNING: this wraps around from
+    //       4294967295 to 0 roughly every 72 minutes
+    Q_UNUSED(handle);
+    Q_UNUSED(user_gpio);
+    callbackData* pUserData = (callbackData*)userdata;
+    if(pUserData->transitionCounter == 0)
+        ticks[0] = 0;
+    else
+        ticks[pUserData->transitionCounter] = currentTick-tick0;
+    tick0 = currentTick;
+    levels[pUserData->transitionCounter] = level;
+    pUserData->transitionCounter++;
+    if(pUserData->transitionCounter >= MAXTIMINGS) {
+        // When AM2302 is sending data to MCU, every bit's
+        // transmission begin with low-voltage-level that last 50us
+        uint8_t j = 0;
+        for(uint8_t i=3; i<MAXTIMINGS; i+=2) {
+            dht22_dat[j/8] <<= 1;
+            if(ticks[i+1] > ticks[i])
+                dht22_dat[j/8] |= 1;
+            j++;
+        }
+
+        // verify checksum
+        uint8_t sum = ((dht22_dat[0] + dht22_dat[1] + dht22_dat[2] + dht22_dat[3]) & 0xFF);
+        bool bChecksum = (dht22_dat[4] == sum);
+        if(bChecksum) {
+            pUserData->iHumidity    = dht22_dat[0]*256 + dht22_dat[1];
+            pUserData->iTemperature = (dht22_dat[2] & 0x7F)*256 + dht22_dat[3];
+            if((dht22_dat[2] & 0x80) != 0)
+                pUserData->iTemperature *= -1;
+            emit(((MainWindow *)(pUserData->pMainWindow))->dhtMeasureDone());
+        }
+    }
+    return 0;
+}
 
 
 MainWindow::MainWindow(int iBoard, QWidget *parent)
@@ -78,16 +129,19 @@ MainWindow::MainWindow(int iBoard, QWidget *parent)
     // in the 40 pin GPIO connector.
 {
     // Init internal variables
-    gpibBoardID             = iBoard;
-    bUseMonochromator       = false;
-    gpioHostHandle          =-1;
-    presentMeasure          = NoMeasure;
-    bRunning                = false;
-    isK236ReadyForTrigger   = false;
-    isHp3478ReadyForTrigger = false;
-    maxPlotPoints           = 3000;
-    wlResolution            = 5;// Wavelength steps. To be changed
-    iDHT22_Humidity         = 0;
+    gpibBoardID                = iBoard;
+    bUseMonochromator          = false;
+    gpioHostHandle             =-1;
+    presentMeasure             = NoMeasure;
+    bRunning                   = false;
+    isK236ReadyForTrigger      = false;
+    isHp3478ReadyForTrigger    = false;
+    maxPlotPoints              = 3000;
+    wlResolution               = 5; // Wavelength steps. To be changed
+    userData.pMainWindow       = (void*)this;
+    userData.iHumidity         = 0;
+    userData.transitionCounter = 0;
+    userData.callBackId        = pigif_bad_callback;
 
     // Prepare message logging
     sLogFileName = QString("gpibLog.txt");
@@ -116,6 +170,7 @@ MainWindow::MainWindow(int iBoard, QWidget *parent)
     QSettings settings;
     restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
     restoreState(settings.value("mainWindowState").toByteArray());
+    thread()->setPriority(QThread::TimeCriticalPriority);
 }
 
 
@@ -462,9 +517,6 @@ MainWindow::checkInstruments() {
     }
 #endif
     bUseGpio = gpioHostHandle >= 0;
-    bDHT22Present = false;
-    if(bUseGpio)
-        bDHT22Present = read_dht22(&iDHT22_Humidity, &iDHT22_Temperature) != 0;
 
     switchLampOff();
     ui->statusBar->showMessage("GPIB Instruments Found! Ready to Start");
@@ -884,9 +936,11 @@ MainWindow::on_startRvsTimeButton_clicked() {
 
     // Configure the needed timers
     if(bDHT22Present) {
+        connect(this, SIGNAL(dhtMeasureDone()),
+                this, SLOT(onNewRHdata()));
         connect(&readingDHT22Timer, SIGNAL(timeout()),
                 this, SLOT(onTimeToReadHumidity()));
-        readingDHT22Timer.start(1000);
+        readingDHT22Timer.start(3000);
     }
     if(pLakeShore330) {
 //        connect(&readingTTimer, SIGNAL(timeout()),
@@ -1865,7 +1919,7 @@ MainWindow::onNewRvsTKeithleyReading(QDateTime dateTime, QString sDataRead) {
                             .arg(currentTemperature, 12, 'g', 6, ' ')
                             .arg(voltage, 12, 'g', 6, ' ')
                             .arg(current, 12, 'g', 6, ' ')
-                            .arg(iDHT22_Humidity, 12, 'i', 6, ' ');
+                            .arg(userData.iHumidity/10.0, 12, 'i', 6, ' ');
     pOutputFile->write(sData.toLocal8Bit());
     if(currentLampStatus == LAMP_OFF) {
         if(voltage != 0.0) {
@@ -1908,7 +1962,7 @@ MainWindow::onNewRvsTimeHp3478Reading(QDateTime dateTime, QString sDataRead) {
                             .arg(elapsedTime, 12, 'g', 6, ' ')
                             .arg(resistance, 12, 'g', 6, ' ')
                             .arg(currentTemperature, 12, 'g', 6, ' ')
-                            .arg(iDHT22_Humidity, 12, 'i', 6, ' ');
+                            .arg(userData.iHumidity/10.0, 12, 'i', 6, ' ');
     pOutputFile->write(sData.toLocal8Bit());
     pOutputFile->flush();
 
@@ -1938,12 +1992,12 @@ MainWindow::onNewRvsTimeKeithleyReading(QDateTime dateTime, QString sDataRead) {
 
     if(!bRunning) return;
 
-    QString sData = QString("%1 %2 %3 %4\n")
+    QString sData = QString("%1 %2 %3 %4 %5\n")
                             .arg(elapsedTime, 12, 'g', 6, ' ')
                             .arg(voltage, 12, 'g', 6, ' ')
                             .arg(current, 12, 'g', 6, ' ')
                             .arg(currentTemperature, 12, 'g', 6, ' ')
-                            .arg(iDHT22_Humidity, 12, 'i', 6, ' ');
+                            .arg(userData.iHumidity/10.0, 12, 'i', 6, ' ');
     pOutputFile->write(sData.toLocal8Bit());
     pOutputFile->flush();
     if(current != 0.0) {
@@ -1995,7 +2049,7 @@ MainWindow::onNewLambdaScanKeithleyReading(QDateTime dataTime, QString sDataRead
                                 .arg(currentTemperature, 12, 'g', 6, ' ')
                                 .arg(voltage, 12, 'g', 6, ' ')
                                 .arg(current, 12, 'g', 6, ' ')
-                                .arg(iDHT22_Humidity, 12, 'i', 6, ' ');
+                                .arg(userData.iHumidity/10.0, 12, 'i', 6, ' ');
         pOutputFile->write(sData.toLocal8Bit());
         if(voltage != 0.0) {
             sigmaDark = current/voltage;
@@ -2014,7 +2068,7 @@ MainWindow::onNewLambdaScanKeithleyReading(QDateTime dataTime, QString sDataRead
                                 .arg(currentTemperature, 12, 'g', 6, ' ')
                                 .arg(voltage, 12, 'g', 6, ' ')
                                 .arg(current, 12, 'g', 6, ' ')
-                                .arg(iDHT22_Humidity, 12, 'i', 6, ' ');
+                                .arg(userData.iHumidity/10.0, 12, 'i', 6, ' ');
         pOutputFile->write(sData.toLocal8Bit());
         pOutputFile->flush();
         switchLampOff();
@@ -2050,7 +2104,7 @@ MainWindow::onKeithleySweepDone(QDateTime dataTime, QString sData) {
                 .arg(voltage, 12, 'g', 6, ' ')
                 .arg(current, 12, 'g', 6, ' ')
                 .arg(currentTemperature, 12, 'g', 6, ' ')
-                .arg(iDHT22_Humidity, 12, 'i', 6, ' ');
+                .arg(userData.iHumidity/10.0, 12, 'i', 6, ' ');
         pOutputFile->write(sData.toLocal8Bit());
         pPlotMeasurements->NewPoint(1, voltage, current);
     }
@@ -2117,7 +2171,7 @@ MainWindow::onIForwardSweepDone(QDateTime dataTime, QString sData) {
                            .arg(voltage, 12, 'g', 6, ' ')
                            .arg(current, 12, 'g', 6, ' ')
                            .arg(setPointT, 12, 'g', 6, ' ')
-                           .arg(iDHT22_Humidity, 12, 'i', 6, ' ')
+                           .arg(userData.iHumidity/10.0, 12, 'i', 6, ' ')
                            .toLocal8Bit());
         pPlotMeasurements->NewPoint(1, voltage, current);
     }
@@ -2171,7 +2225,7 @@ MainWindow::onVReverseSweepDone(QDateTime dataTime, QString sData) {
                            .arg(voltage, 12, 'g', 6, ' ')
                            .arg(current, 12, 'g', 6, ' ')
                            .arg(setPointT, 12, 'g', 6, ' ')
-                           .arg(iDHT22_Humidity, 12, 'i', 6, ' ')
+                           .arg(userData.iHumidity/10.0, 12, 'i', 6, ' ')
                            .toLocal8Bit());
         pPlotMeasurements->NewPoint(1, voltage, current);
     }
@@ -2233,75 +2287,53 @@ MainWindow::on_logoButton_clicked() {
 
 void
 MainWindow::onTimeToReadHumidity() {
-    read_dht22(&iDHT22_Humidity, &iDHT22_Temperature);
+    read_dht22();
+}
+
+
+void
+MainWindow::onNewRHdata() {
     if(pPlotRH) {
         currentTime = QDateTime::currentDateTime();
         pPlotRH->NewPoint(1,
-                          double(startReadingTTime.secsTo(currentTime)),
-                          double(iDHT22_Humidity));
+                          double(dateStart.secsTo(currentTime)),
+                          double(userData.iHumidity/10.0));
         pPlotRH->UpdatePlot();
     }
 }
 
 
-int
-MainWindow::read_dht22(int* piHumidity, int* piTemp) {
-    memset(dht22_dat, 0, sizeof(dht22_dat));
+bool
+MainWindow::read_dht22() {
+    userData.transitionCounter = 0;
+    if(userData.callBackId != pigif_bad_callback)
+        if(callback_cancel(userData.callBackId))
+            qDebug() << "callback_cancel Failed";
+    set_pull_up_down(gpioHostHandle, gpioDHT22pin, PI_PUD_UP);
+    set_mode(gpioHostHandle, gpioDHT22pin, PI_OUTPUT);
 
-    // pull pin down for 18 milliseconds
-    if(set_mode(gpioHostHandle, gpioDHT22pin, PI_OUTPUT) != 0)
-        qDebug() << "Error";
-    if(gpio_write(gpioHostHandle, gpioDHT22pin, 0) == PI_BAD_GPIO)
-        qDebug() << "Error";
-    QThread::msleep(18);
+    // pull pin down for 2 milliseconds
+    gpio_write(gpioHostHandle, gpioDHT22pin, 0);
+    QThread::msleep(2);
 
-    // then pull it up for 40 microseconds
-    if(gpio_write(gpioHostHandle, gpioDHT22pin, 1) == PI_BAD_GPIO)
-        qDebug() << "Error";
+    // then pull it up for 40 microseconds by simply let
+    // the pulllup to operate and prepare to read the pin
+    set_mode(gpioHostHandle, gpioDHT22pin, PI_INPUT);
     QThread::usleep(40);
-
-    // prepare to read the pin
-    if(set_mode(gpioHostHandle, gpioDHT22pin, PI_INPUT) != 0)
-        qDebug() << "Error";
-
-    // detect change and read data
-    uint8_t j = 0;
-    uint8_t laststate = 1;
-    uint8_t counter;
-    for(uint8_t i=0; i<MAXTIMINGS; i++) {
-        counter = 0;
-        while(gpio_read(gpioHostHandle, gpioDHT22pin) == laststate) {
-            counter++;
-            QThread::usleep(1);
-            if(counter == 255) {
-                break;
-            }
-        }
-        laststate = gpio_read(gpioHostHandle, gpioDHT22pin);
-
-        if(counter == 255) break;
-
-        // ignore first 3 transitions
-        if((i >= 4) && (i%2 == 0)) {
-            // shove each bit into the storage bytes
-            dht22_dat[j/8] <<= 1;
-            if(counter > 16)
-                dht22_dat[j/8] |= 1;
-            j++;
-        }
+    userData.callBackId = callback_ex(gpioHostHandle,
+                                      gpioDHT22pin,
+                                      EITHER_EDGE,
+                                      CBFuncEx_t(dht22Callback),
+                                      (void *)&userData);
+    if(userData.callBackId < 0) {
+        if(userData.callBackId == pigif_bad_malloc)
+            qDebug() << "pigif_bad_malloc";
+        if(userData.callBackId == pigif_duplicate_callback)
+            qDebug() << "pigif_duplicate_callback";
+        if(userData.callBackId == pigif_bad_callback)
+            qDebug() << "pigif_bad_callback";
+        return false;
     }
 
-    // check we read 40 bits (8bit x 5 ) + verify checksum in the last byte
-    // print it out if data is good
-    bool bChecksum = dht22_dat[4] == ((dht22_dat[0] + dht22_dat[1] + dht22_dat[2] + dht22_dat[3]) & 0xFF);
-    if((j >= 40) && bChecksum) {
-        *piHumidity = dht22_dat[0] * 256 + dht22_dat[1];
-        *piTemp = (dht22_dat[2] & 0x7F)* 256 + dht22_dat[3];
-        if((dht22_dat[2] & 0x80) != 0)
-            *piTemp *= -1;
-        return 1;
-    }
-    else {
-        return 0;
-    }
+    return true;
 }
