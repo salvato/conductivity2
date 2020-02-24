@@ -1537,8 +1537,20 @@ MainWindow::initRvsTimePlots() {
     if(pPlotTemperature) delete pPlotTemperature;
     pPlotTemperature = Q_NULLPTR;
 
-    // Plot of Resistance vs Time
-    sMeasurementPlotLabel = QString("R [Ohm] -vs- Time [s]");
+    if(!pKeithley236) return;
+    QString sTitle;
+    if(pConfigureDialog->pTabK236->bSourceI &&
+       pConfigureDialog->pTabK236->dStart == 0.0) {
+        // Plot Open Circuit Voltage vs Time
+        sMeasurementPlotLabel = QString("Voc [V] -vs- Time [s]");
+        sTitle = "V(t)";
+    }
+    else {
+        // Plot of Resistance vs Time
+        sMeasurementPlotLabel = QString("R [Ohm] -vs- Time [s]");
+        sTitle = "R(t)";
+    }
+
     pPlotMeasurements = new Plot2D(this, sMeasurementPlotLabel);
     pPlotMeasurements->setWindowTitle(pConfigureDialog->pTabFile->sOutFileName);
     pPlotMeasurements->setMaxPoints(maxPlotPoints);
@@ -1548,7 +1560,7 @@ MainWindow::initRvsTimePlots() {
                                   3,                   //Pen Width
                                   QColor(255, 255, 64),// Color
                                   Plot2D::ipoint,      // Symbol
-                                  "R(t)"               // Title
+                                  sTitle               // Title
                        );
     pPlotMeasurements->SetShowDataSet(iPlotDark, true);
     pPlotMeasurements->SetShowTitle(iPlotDark, true);
@@ -2002,6 +2014,10 @@ MainWindow::onNewRvsTimeKeithleyReading(QDateTime dateTime, QString sDataRead) {
     pOutputFile->flush();
     if(current != 0.0) {
         pPlotMeasurements->NewPoint(iPlotDark, elapsedTime, voltage/current);
+        pPlotMeasurements->UpdatePlot();
+    }
+    else {
+        pPlotMeasurements->NewPoint(iPlotDark, elapsedTime, voltage);
         pPlotMeasurements->UpdatePlot();
     }
 }
