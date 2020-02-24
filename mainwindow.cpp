@@ -517,6 +517,7 @@ MainWindow::checkInstruments() {
     }
 #endif
     bUseGpio = gpioHostHandle >= 0;
+    bDHT22Present = bUseGpio;
 
     switchLampOff();
     ui->statusBar->showMessage("GPIB Instruments Found! Ready to Start");
@@ -1540,17 +1541,24 @@ MainWindow::initRvsTimePlots() {
     if(!pKeithley236) return;
     QString sTitle;
     if(pConfigureDialog->pTabK236->bSourceI &&
-       pConfigureDialog->pTabK236->dStart == 0.0) {
+       pConfigureDialog->pTabK236->dStart == 0.0)
+    {
         // Plot Open Circuit Voltage vs Time
         sMeasurementPlotLabel = QString("Voc [V] -vs- Time [s]");
         sTitle = "V(t)";
+    }
+    else if(!pConfigureDialog->pTabK236->bSourceI &&
+            pConfigureDialog->pTabK236->dStart == 0.0)
+    {
+        // Plot Short Circuit Crrent vs Time
+        sMeasurementPlotLabel = QString("Ish [A] -vs- Time [s]");
+        sTitle = "I(t)";
     }
     else {
         // Plot of Resistance vs Time
         sMeasurementPlotLabel = QString("R [Ohm] -vs- Time [s]");
         sTitle = "R(t)";
     }
-
     pPlotMeasurements = new Plot2D(this, sMeasurementPlotLabel);
     pPlotMeasurements->setWindowTitle(pConfigureDialog->pTabFile->sOutFileName);
     pPlotMeasurements->setMaxPoints(maxPlotPoints);
@@ -2012,12 +2020,16 @@ MainWindow::onNewRvsTimeKeithleyReading(QDateTime dateTime, QString sDataRead) {
                             .arg(userData.iHumidity/10.0, 12, 'i', 6, ' ');
     pOutputFile->write(sData.toLocal8Bit());
     pOutputFile->flush();
-    if(current != 0.0) {
-        pPlotMeasurements->NewPoint(iPlotDark, elapsedTime, voltage/current);
+    if(presentMeasure == RvsTimeSourceI && current == 0.0) {
+        pPlotMeasurements->NewPoint(iPlotDark, elapsedTime, voltage);
         pPlotMeasurements->UpdatePlot();
     }
-    else {
-        pPlotMeasurements->NewPoint(iPlotDark, elapsedTime, voltage);
+    else if(presentMeasure == RvsTimeSourceV && voltage == 0.0) {
+        pPlotMeasurements->NewPoint(iPlotDark, elapsedTime, current);
+        pPlotMeasurements->UpdatePlot();
+    }
+    else if(current != 0.0) {
+        pPlotMeasurements->NewPoint(iPlotDark, elapsedTime, voltage/current);
         pPlotMeasurements->UpdatePlot();
     }
 }
