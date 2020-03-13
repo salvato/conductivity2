@@ -118,10 +118,11 @@ Keithley236::initVvsTSourceI(double dAppliedCurrent, double dCompliance) {
     iErr |= gpibWrite(gpibId, "F1,1X");     // Place for a moment in Source I Measure V Sweep Mode
     // For some reason the Compliance command does not
     // works when in Source I Measure V dc condition
-    if(dAppliedCurrent == 0.0)
-        sCommand = QString("L%1,1X").arg(1.0e-9);
-    else
-        sCommand = QString("L%1,0X").arg(dCompliance);
+    int iScale = 0;
+    if(dAppliedCurrent == 0.0) {
+        iScale = 1;
+    }
+    sCommand = QString("L%1,%2X").arg(dCompliance).arg(iScale);
     iErr |= gpibWrite(gpibId, sCommand);    // Set Compliance, Autorange Measure
     iErr |= gpibWrite(gpibId, "G5,2,0");    // Output Source, Measure, No Prefix, DC
     iErr |= gpibWrite(gpibId, "Z0");        // Disable suppression
@@ -167,10 +168,11 @@ Keithley236::initVvsTSourceV(double dAppliedVoltage, double dCompliance) {
     iErr |= gpibWrite(gpibId, "F0,1X");     // Place for a moment in Source V Measure I Sweep Mode
     // For some reason the Compliance command does not
     // works when in Source I Measure V dc condition
+    int iScale = 0;
     if(dAppliedVoltage == 0.0)
-        sCommand = QString("L%1,1X").arg(1.0);
+        iScale = 1;
     else
-        sCommand = QString("L%1,0X").arg(dCompliance);
+        sCommand = QString("L%1,%2X").arg(dCompliance).arg(iScale);
     iErr |= gpibWrite(gpibId, sCommand);    // Set Compliance, Autorange Measure
     iErr |= gpibWrite(gpibId, "F0,0");      // Source V Measure I dc
     iErr |= gpibWrite(gpibId, "G5,2,0");    // Output Source, Measure, No Prefix, DC
