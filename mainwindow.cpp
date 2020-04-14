@@ -718,9 +718,10 @@ MainWindow::on_startRvsTButton_clicked() {
     connect(&readingTTimer, SIGNAL(timeout()),
             this, SLOT(onTimeToReadT()));
     if(bDHT22Present) {
+        read_dht22();
         connect(&readingDHT22Timer, SIGNAL(timeout()),
                 this, SLOT(onTimeToReadHumidity()));
-        readingDHT22Timer.start(1000);
+        readingDHT22Timer.start(30000);
     }
     waitingTStartTime = QDateTime::currentDateTime();
     // Read and plot initial value of Temperature
@@ -941,7 +942,8 @@ MainWindow::on_startRvsTimeButton_clicked() {
                 this, SLOT(onNewRHdata()));
         connect(&readingDHT22Timer, SIGNAL(timeout()),
                 this, SLOT(onTimeToReadHumidity()));
-        readingDHT22Timer.start(3000);
+        read_dht22();
+        readingDHT22Timer.start(30000);
     }
     if(pLakeShore330) {
 //        connect(&readingTTimer, SIGNAL(timeout()),
@@ -1093,9 +1095,10 @@ MainWindow::on_startIvsVButton_clicked() {
     startReadingTTime = QDateTime::currentDateTime();
     onTimeToReadT();
     if(bDHT22Present) {
+        read_dht22();
         connect(&readingDHT22Timer, SIGNAL(timeout()),
                 this, SLOT(onTimeToReadHumidity()));
-        readingDHT22Timer.start(1000);
+        readingDHT22Timer.start(30000);
     }
     double expectedSeconds;
     startMeasuringTime = QDateTime::currentDateTime();
@@ -1281,9 +1284,10 @@ MainWindow::on_lambdaScanButton_clicked() {
     connect(&readingTTimer, SIGNAL(timeout()),
             this, SLOT(onTimeToReadT()));
     if(bDHT22Present) {
+        read_dht22();
         connect(&readingDHT22Timer, SIGNAL(timeout()),
                 this, SLOT(onTimeToReadHumidity()));
-        readingDHT22Timer.start(1000);
+        readingDHT22Timer.start(30000);
     }
     waitingTStartTime = QDateTime::currentDateTime();
     // Read and plot initial value of Temperature
