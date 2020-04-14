@@ -1575,7 +1575,7 @@ MainWindow::initRvsTimePlots() {
     pPlotMeasurements->UpdatePlot();
     pPlotMeasurements->show();
 
-    if(bUseLakeShore330) {
+    if(bUseLakeShore330 || bDHT22Present) {
         initTemperaturePlot();
     }
     if(bDHT22Present) {
@@ -1967,12 +1967,12 @@ MainWindow::onNewRvsTimeHp3478Reading(QDateTime dateTime, QString sDataRead) {
     elapsedTime = double(dateStart.secsTo(dateTime));
     if(bUseLakeShore330) {
         currentTemperature = pLakeShore330->getTemperature();
-        pPlotTemperature->NewPoint(2, elapsedTime, currentTemperature);
-        pPlotTemperature->UpdatePlot();
-        ui->temperatureEdit->setText(QString("%1").arg(currentTemperature));
     } else {
-        currentTemperature = -1.0;
+        currentTemperature = userData.iTemperature/10.0;
     }
+    pPlotTemperature->NewPoint(2, elapsedTime, currentTemperature);
+    pPlotTemperature->UpdatePlot();
+    ui->temperatureEdit->setText(QString("%1").arg(currentTemperature));
 
     ui->currentEdit->setText(QString("%1").arg(resistance, 10, 'g', 4, ' '));
 
@@ -1999,10 +1999,13 @@ MainWindow::onNewRvsTimeKeithleyReading(QDateTime dateTime, QString sDataRead) {
     elapsedTime = double(dateStart.secsTo(dateTime));
     if(pLakeShore330) {
         currentTemperature = pLakeShore330->getTemperature();
-        pPlotTemperature->NewPoint(2, elapsedTime, currentTemperature);
-        pPlotTemperature->UpdatePlot();
-        ui->temperatureEdit->setText(QString("%1").arg(currentTemperature));
     }
+    else {
+        currentTemperature = userData.iTemperature/10.0;
+    }
+    pPlotTemperature->NewPoint(2, elapsedTime, currentTemperature);
+    pPlotTemperature->UpdatePlot();
+    ui->temperatureEdit->setText(QString("%1").arg(currentTemperature));
     ui->currentEdit->setText(QString("%1").arg(current, 10, 'g', 4, ' '));
     ui->voltageEdit->setText(QString("%1").arg(voltage, 10, 'g', 4, ' '));
     if(bUseMonochromator) {
@@ -2020,11 +2023,11 @@ MainWindow::onNewRvsTimeKeithleyReading(QDateTime dateTime, QString sDataRead) {
                             .arg(userData.iHumidity/10.0, 12, 'i', 6, ' ');
     pOutputFile->write(sData.toLocal8Bit());
     pOutputFile->flush();
-    if(presentMeasure == RvsTimeSourceI && current == 0.0) {
+    if(presentMeasure == RvsTimeSourceI && fabs(current) < 1.0e-16) {
         pPlotMeasurements->NewPoint(iPlotDark, elapsedTime, voltage);
         pPlotMeasurements->UpdatePlot();
     }
-    else if(presentMeasure == RvsTimeSourceV && voltage == 0.0) {
+    else if(presentMeasure == RvsTimeSourceV && fabs(voltage) < 1e-16) {
         pPlotMeasurements->NewPoint(iPlotDark, elapsedTime, current);
         pPlotMeasurements->UpdatePlot();
     }
