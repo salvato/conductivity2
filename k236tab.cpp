@@ -39,7 +39,7 @@ K236Tab::K236Tab(int iConfiguration, QWidget *parent)
     , nSweepPointsMin(3)
     , nSweepPointsMax(500)
     , intervalMin(0.1)
-    , intervalMax(60.0)
+    , intervalMax(600.0)
     , myConfiguration(iConfiguration)
 {
     // Create UI Elements
