@@ -73,7 +73,7 @@ Keithley236::~Keithley236() {
 
 int
 Keithley236::init() {
-    gpibId = ibdev(gpibNumber, gpibAddress, 0, T10s, 1, 0);
+    gpibId = ibdev(gpibNumber, gpibAddress, 0, T3s, 1, 0);
     if(gpibId < 0) {
         QString sError = ErrMsg(ThreadIbsta(), ThreadIberr(), ThreadIbcntl());
         emit sendMessage(Q_FUNC_INFO + sError);
