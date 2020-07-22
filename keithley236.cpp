@@ -438,8 +438,12 @@ Keithley236::onGpibCallback(int LocalUd, unsigned long LocalIbsta, unsigned long
     Q_UNUSED(LocalIberr)
     Q_UNUSED(LocalIbcntl)
 
-    if(ibrsp(LocalUd, &spollByte) & ERR) {
+    spollByte = 0;
+    int iStatus = ibrsp(LocalUd, &spollByte);
+    if(iStatus & ERR) {
         emit sendMessage(QString(Q_FUNC_INFO) + QString("GPIB error %1").arg(LocalIberr));
+        emit sendMessage(QString(Q_FUNC_INFO) + QString("ibrsp() returned: %1").arg(iStatus));
+        emit sendMessage(QString(Q_FUNC_INFO) + QString("Serial Poll Response Byte %1").arg(spollByte));
     }
 
     if(spollByte & COMPLIANCE) {// Compliance
