@@ -218,7 +218,7 @@ extern "C" {
 
 CBFuncEx_t dht22Callback(int handle,
                          unsigned user_gpio,
-                         unsigned level,
+                         uint8_t level,
                          uint32_t currentTick,
                          void *userdata);
 

@@ -54,15 +54,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MAXTIMINGS 83
 
 
-uint32_t tick0;
-uint8_t ticks[MAXTIMINGS];
-uint8_t levels[MAXTIMINGS];
-uint8_t dht22_dat[5];
+static uint32_t tick0;
+static uint8_t ticks[MAXTIMINGS];
+static uint8_t levels[MAXTIMINGS];
+static uint8_t dht22_dat[5];
 
 
 CBFuncEx_t dht22Callback(int handle,
                          unsigned user_gpio,
-                         unsigned level,
+                         uint8_t level,
                          uint32_t currentTick,
                          void *userdata)
 {
@@ -71,11 +71,11 @@ CBFuncEx_t dht22Callback(int handle,
     //       4294967295 to 0 roughly every 72 minutes
     Q_UNUSED(handle);
     Q_UNUSED(user_gpio);
-    callbackData* pUserData = (callbackData*)userdata;
+    callbackData* pUserData = reinterpret_cast<callbackData*>(userdata);
     if(pUserData->transitionCounter == 0)
         ticks[0] = 0;
     else
-        ticks[pUserData->transitionCounter] = currentTick-tick0;
+        ticks[pUserData->transitionCounter] = uint8_t(currentTick-tick0);
     tick0 = currentTick;
     levels[pUserData->transitionCounter] = level;
     pUserData->transitionCounter++;
@@ -98,10 +98,10 @@ CBFuncEx_t dht22Callback(int handle,
             pUserData->iTemperature = (dht22_dat[2] & 0x7F)*256 + dht22_dat[3];
             if((dht22_dat[2] & 0x80) != 0)
                 pUserData->iTemperature *= -1;
-            emit(((MainWindow *)(pUserData->pMainWindow))->dhtMeasureDone());
+            emit((reinterpret_cast<MainWindow*>(pUserData->pMainWindow))->dhtMeasureDone());
         }
     }
-    return 0;
+    return nullptr;
 }
 
 
