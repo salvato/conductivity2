@@ -138,7 +138,8 @@ MainWindow::MainWindow(int iBoard, QWidget *parent)
     isHp3478ReadyForTrigger    = false;
     maxPlotPoints              = 3000;
     wlResolution               = 5; // Wavelength steps. To be changed
-    userData.pMainWindow       = (void*)this;
+    userData.pMainWindow       = reinterpret_cast<void*>(this);
+    userData.iTemperature      = 0;
     userData.iHumidity         = 0;
     userData.transitionCounter = 0;
     userData.callBackId        = pigif_bad_callback;
@@ -2007,9 +2008,11 @@ MainWindow::onNewRvsTimeKeithleyReading(QDateTime dateTime, QString sDataRead) {
     else {
         currentTemperature = userData.iTemperature/10.0;
     }
-    pPlotTemperature->NewPoint(2, elapsedTime, currentTemperature);
-    pPlotTemperature->UpdatePlot();
-    ui->temperatureEdit->setText(QString("%1").arg(currentTemperature));
+    if(pPlotTemperature) {
+        pPlotTemperature->NewPoint(2, elapsedTime, currentTemperature);
+        pPlotTemperature->UpdatePlot();
+        ui->temperatureEdit->setText(QString("%1").arg(currentTemperature));
+    }
     ui->currentEdit->setText(QString("%1").arg(current, 10, 'g', 4, ' '));
     ui->voltageEdit->setText(QString("%1").arg(voltage, 10, 'g', 4, ' '));
     if(bUseMonochromator) {
@@ -2342,7 +2345,7 @@ bool
 MainWindow::read_dht22() {
     userData.transitionCounter = 0;
     if(userData.callBackId != pigif_bad_callback)
-        if(callback_cancel(userData.callBackId))
+        if(callback_cancel(uint(userData.callBackId)))
             qDebug() << "callback_cancel Failed";
     set_pull_up_down(gpioHostHandle, gpioDHT22pin, PI_PUD_UP);
     set_mode(gpioHostHandle, gpioDHT22pin, PI_OUTPUT);
@@ -2359,7 +2362,7 @@ MainWindow::read_dht22() {
                                       gpioDHT22pin,
                                       EITHER_EDGE,
                                       CBFuncEx_t(dht22Callback),
-                                      (void *)&userData);
+                                      reinterpret_cast<void *>(&userData));
     if(userData.callBackId < 0) {
         if(userData.callBackId == pigif_bad_malloc)
             qDebug() << "pigif_bad_malloc";

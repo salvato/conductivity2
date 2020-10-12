@@ -200,8 +200,8 @@ private:
     bool             bRunning;
     int              junctionDirection;
     int              gpioHostHandle;
-    int              gpioLEDpin;
-    int              gpioDHT22pin;
+    uint             gpioLEDpin;
+    uint             gpioDHT22pin;
     double           sigmaDark;
     double           sigmaIll;
     double           wlResolution;
