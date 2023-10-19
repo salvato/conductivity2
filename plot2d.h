@@ -40,6 +40,7 @@ public:
                     bool AutoX, bool AutoY, bool LogX, bool LogY);
     DataStream2D* NewDataSet(int Id, int PenWidth, QColor Color, int Symbol, QString Title);
     bool DelDataSet(int Id);
+    bool ClearDataSet(int Id);
     void NewPoint(int Id, double x, double y);
     void SetShowDataSet(int Id, bool Show);
     void SetShowTitle(int Id, bool show);

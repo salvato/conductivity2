@@ -28,7 +28,7 @@ DataStream2D::DataStream2D(int Id, int PenWidth, QColor Color, int Symbol, QStri
     if(Title != QString())
         Properties.Title = Title;
     else
-        Properties.Title.sprintf("Data Set %d", Properties.GetId());
+        Properties.Title = QString("Data Set %1").arg(Properties.GetId());
     isShown         = false;
     bShowCurveTitle = false;
     maxPoints = 100;
@@ -38,7 +38,7 @@ DataStream2D::DataStream2D(int Id, int PenWidth, QColor Color, int Symbol, QStri
 DataStream2D::DataStream2D(DataSetProperties myProperties) {
     Properties = myProperties;
     if(myProperties.Title == QString())
-        Properties.Title.sprintf("Data Set %d", Properties.GetId());
+        Properties.Title = QString("Data Set %1").arg(Properties.GetId());
     isShown         = false;
     bShowCurveTitle = false;
     maxPoints = 100;

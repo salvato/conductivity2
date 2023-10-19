@@ -101,7 +101,7 @@ void
 FileTab::on_outFilePathButton_clicked() {
     QFileDialog chooseDirDialog;
     QDir outDir(sBaseDir);
-    chooseDirDialog.setFileMode(QFileDialog::DirectoryOnly);
+    chooseDirDialog.setOption(QFileDialog::ShowDirsOnly, true);
     if(outDir.exists())
         chooseDirDialog.setDirectory(outDir);
     else

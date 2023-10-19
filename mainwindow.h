@@ -216,11 +216,11 @@ private:
 extern "C" {
 #endif
 
-CBFuncEx_t dht22Callback(int handle,
-                         unsigned user_gpio,
-                         uint8_t level,
-                         uint32_t currentTick,
-                         void *userdata);
+void dht22Callback(int handle,
+                   unsigned user_gpio,
+                   unsigned int level,
+                   uint32_t currentTick,
+                   void *userdata);
 
 #ifdef __cplusplus
 }

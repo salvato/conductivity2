@@ -60,9 +60,9 @@ static uint8_t levels[MAXTIMINGS];
 static uint8_t dht22_dat[5];
 
 
-CBFuncEx_t dht22Callback(int handle,
+void dht22Callback(int handle,
                          unsigned user_gpio,
-                         uint8_t level,
+                         unsigned level,
                          uint32_t currentTick,
                          void *userdata)
 {
@@ -101,7 +101,6 @@ CBFuncEx_t dht22Callback(int handle,
             emit((reinterpret_cast<MainWindow*>(pUserData->pMainWindow))->dhtMeasureDone());
         }
     }
-    return nullptr;
 }
 
 
@@ -2047,7 +2046,7 @@ MainWindow::onNewRvsTimeKeithleyReading(QDateTime dateTime, QString sDataRead) {
 
 bool
 MainWindow::DecodeReadings(QString sDataRead, double *current, double *voltage) {    // Decode readings
-    QStringList sMeasures = QStringList(sDataRead.split(",", QString::SkipEmptyParts));
+    QStringList sMeasures = QStringList(sDataRead.split(",", Qt::SkipEmptyParts));
     if(sMeasures.count() < 2) {
         logMessage("Measurement Format Error");
         return false;
@@ -2120,7 +2119,7 @@ MainWindow::onKeithleySweepDone(QDateTime dataTime, QString sData) {
     Q_UNUSED(dataTime)
     disconnect(pKeithley236, SIGNAL(sweepDone(QDateTime,QString)), this, Q_NULLPTR);
     ui->statusBar->showMessage("Sweep Done: Decoding readings...Please wait");
-    QStringList sMeasures = QStringList(sData.split(",", QString::SkipEmptyParts));
+    QStringList sMeasures = QStringList(sData.split(",", Qt::SkipEmptyParts));
     if(sMeasures.count() < 2) {
         stopIvsV();
         ui->statusBar->showMessage(QString(Q_FUNC_INFO) + QString(" Error: No Sweep Values"));
@@ -2190,7 +2189,7 @@ MainWindow::onIForwardSweepDone(QDateTime dataTime, QString sData) {
     Q_UNUSED(dataTime)
     ui->statusBar->showMessage("Reverse Direction: Sweeping...Please Wait");
     disconnect(pKeithley236, SIGNAL(sweepDone(QDateTime,QString)), this, Q_NULLPTR);
-    QStringList sMeasures = QStringList(sData.split(",", QString::SkipEmptyParts));
+    QStringList sMeasures = QStringList(sData.split(",", Qt::SkipEmptyParts));
     if(sMeasures.count() < 2) {
         logMessage(QString(Q_FUNC_INFO) + QString(" No Sweep Values "));
         return;
@@ -2244,7 +2243,7 @@ MainWindow::onVReverseSweepDone(QDateTime dataTime, QString sData) {
     Q_UNUSED(dataTime)
     ui->statusBar->showMessage("Forward Direction: Sweeping...Please Wait");
     disconnect(pKeithley236, SIGNAL(sweepDone(QDateTime,QString)), this, Q_NULLPTR);
-    QStringList sMeasures = QStringList(sData.split(",", QString::SkipEmptyParts));
+    QStringList sMeasures = QStringList(sData.split(",", Qt::SkipEmptyParts));
     if(sMeasures.count() < 2) {
         logMessage(QString(Q_FUNC_INFO) + QString(" No Sweep Values "));
         return;

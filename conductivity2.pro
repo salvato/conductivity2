@@ -84,10 +84,11 @@ windows {
 }
 linux {
     message("Running on Linux")
-    LIBS += -L"/usr/local/lib" -lgpib # To include libgpib.so from /usr/local/lib
+    LIBS += -lgpib # To include libgpib.so
     INCLUDEPATH += /usr/local/include
-    contains(QMAKE_HOST.arch, "armv7l") || contains(QMAKE_HOST.arch, "armv6l"): {
-        LIBS += -lpigpiod_if2 # To include libpigpiod_if2.so from /usr/local/lib
+    contains(QMAKE_HOST.arch, "armv")
+    {
+        LIBS += -lpigpiod_if2 # To include libpigpiod_if2.so
     }
 }
 
