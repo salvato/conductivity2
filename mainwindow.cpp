@@ -20,20 +20,10 @@ MainWindow::MainWindow(QWidget *parent)
 {
     int flag;
     signed short svalue;
-    uint8_t input, channel, gain, options;
-    uint8_t gains[8], channels[8];
-    uint16_t value;
-    uint16_t out_data[512];
-    signed short in_data[1024];
+    uint8_t channel, gain;
     int count;
-    int temp, i, j;
-    int ch;
-    float freq;
-    float *fvalue;
+    int temp;
     time_t startTime, endTime;
-    getAllValues allValue;
-    uint16_t address;
-    uint8_t memory[64];
 
     ui->setupUi(this);
 
